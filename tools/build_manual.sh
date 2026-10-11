@@ -23,7 +23,7 @@ PROJ=~/workspace/castlink
 OUT=$PROJ/build/manual
 VERSION_NAME="0.1.0"
 VERSION_CODE=21
-APK_NAME="CastLink-v${VERSION_NAME}-debug.apk"
+APK_NAME="CastLink-v${VERSION_NAME}.apk"
 rm -rf "$OUT"
 mkdir -p "$OUT/gen" "$OUT/classes" "$OUT/dex"
 
