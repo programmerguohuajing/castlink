@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- NEBULA 主背景：深空渐变 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <gradient
+        android:angle="135"
+        android:startColor="#050810"
+        android:centerColor="#080D1D"
+        android:endColor="#0D1730"
+        android:type="linear" />
+</shape>

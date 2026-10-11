@@ -1,0 +1,237 @@
+package com.castlink.receiver.ui
+
+import android.app.AlertDialog
+import android.content.SharedPreferences
+import android.os.Build
+import android.os.Bundle
+import android.widget.ArrayAdapter
+import android.widget.Button
+import android.widget.EditText
+import android.widget.LinearLayout
+import android.widget.RadioGroup
+import android.widget.Spinner
+import android.widget.Switch
+import android.widget.TextView
+import android.widget.Toast
+import com.castlink.receiver.R
+import com.castlink.receiver.update.UpdateManager
+import com.castlink.receiver.update.UpdatePrefs
+import com.castlink.receiver.util.LocaleHelper
+
+/**
+ * 设置页（UI-04）：语言切换、本机能力卡、画质单选、开关项、设备名。
+ */
+class SettingsActivity : BaseActivity() {
+
+    private lateinit var prefs: SharedPreferences
+    private lateinit var tvLangSummary: TextView
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_settings)
+        prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
+
+        // 语言：副标题显示当前生效语言，点击弹单选对话框
+        tvLangSummary = findViewById(R.id.tv_lang_summary)
+        tvLangSummary.text = LocaleHelper.getDisplayName(this)
+        findViewById<LinearLayout>(R.id.row_language).setOnClickListener {
+            showLanguageDialog()
+        }
+
+        // 画质单选（持久化）
+        val rgQuality = findViewById<RadioGroup>(R.id.rg_quality)
+        val quality = prefs.getString(KEY_QUALITY, QUALITY_AUTO) ?: QUALITY_AUTO
+        rgQuality.check(
+            when (quality) {
+                QUALITY_FLAGSHIP -> R.id.rb_quality_flagship
+                QUALITY_1080P -> R.id.rb_quality_1080p
+                QUALITY_720P -> R.id.rb_quality_720p
+                else -> R.id.rb_quality_auto
+            }
+        )
+        rgQuality.setOnCheckedChangeListener { _, checkedId ->
+            val value = when (checkedId) {
+                R.id.rb_quality_flagship -> QUALITY_FLAGSHIP
+                R.id.rb_quality_1080p -> QUALITY_1080P
+                R.id.rb_quality_720p -> QUALITY_720P
+                else -> QUALITY_AUTO
+            }
+            prefs.edit().putString(KEY_QUALITY, value).apply()
+        }
+
+        // 优先 5GHz（持久化）
+        val swPrefer5g = findViewById<Switch>(R.id.sw_prefer_5g)
+        swPrefer5g.isChecked = prefs.getBoolean(KEY_PREFER_5G, false)
+        swPrefer5g.setOnCheckedChangeListener { _, isChecked ->
+            prefs.edit().putBoolean(KEY_PREFER_5G, isChecked).apply()
+        }
+
+        // Legacy Android 4 接收模式（限 720p），主线包内开关占位（持久化）
+        val swLegacy = findViewById<Switch>(R.id.sw_legacy_mode)
+        swLegacy.isChecked = prefs.getBoolean(KEY_LEGACY_MODE, false)
+        swLegacy.setOnCheckedChangeListener { _, isChecked ->
+            prefs.edit().putBoolean(KEY_LEGACY_MODE, isChecked).apply()
+        }
+
+        // 设备名（持久化，供 mDNS 广播用）
+        val etDeviceName = findViewById<EditText>(R.id.et_device_name)
+        etDeviceName.setText(
+            prefs.getString(KEY_DEVICE_NAME, getString(R.string.default_device_name))
+        )
+        findViewById<Button>(R.id.btn_save_device_name).setOnClickListener {
+            val name = etDeviceName.text.toString().trim()
+            if (name.isNotEmpty()) {
+                prefs.edit().putString(KEY_DEVICE_NAME, name).apply()
+                Toast.makeText(this, R.string.device_name_saved, Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        // v0.3.12：在线更新
+        setupUpdateSection()
+    }
+
+    /** v0.3.12：更新源配置 + 检查更新 + 下载安装 */
+    private fun setupUpdateSection() {
+        val updatePrefs = UpdatePrefs(this)
+        val tvVersion = findViewById<TextView>(R.id.tv_update_version)
+        val etOwner = findViewById<EditText>(R.id.et_update_owner)
+        val etRepo = findViewById<EditText>(R.id.et_update_repo)
+        val spMirror = findViewById<Spinner>(R.id.sp_update_mirror)
+        val swAuto = findViewById<Switch>(R.id.sw_auto_update)
+
+        val pkg = packageManager.getPackageInfo(packageName, 0)
+        @Suppress("DEPRECATION")
+        val vc = if (Build.VERSION.SDK_INT >= 28) pkg.longVersionCode.toInt() else pkg.versionCode
+        tvVersion.text = getString(R.string.update_current_version, pkg.versionName, vc)
+
+        etOwner.setText(updatePrefs.owner)
+        etRepo.setText(updatePrefs.repo)
+        val mirrorNames = UpdateManager.MIRRORS.map { it.removePrefix("https://").removeSuffix("/") }
+        spMirror.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, mirrorNames).apply {
+            setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        }
+        spMirror.setSelection(updatePrefs.mirrorIndex.coerceIn(mirrorNames.indices))
+        swAuto.isChecked = updatePrefs.autoCheck
+        swAuto.setOnCheckedChangeListener { _, checked -> updatePrefs.autoCheck = checked }
+
+        findViewById<Button>(R.id.btn_save_update_cfg).setOnClickListener {
+            updatePrefs.owner = etOwner.text.toString()
+            updatePrefs.repo = etRepo.text.toString()
+            updatePrefs.mirrorIndex = spMirror.selectedItemPosition
+            Toast.makeText(this, R.string.update_cfg_saved, Toast.LENGTH_SHORT).show()
+        }
+        findViewById<Button>(R.id.btn_check_update).setOnClickListener {
+            checkUpdate(manual = true)
+        }
+    }
+
+    /** 检查更新；manual=true 时无更新也 toast 提示 */
+    fun checkUpdate(manual: Boolean = false) {
+        val tvVersion = findViewById<TextView>(R.id.tv_update_version)
+        tvVersion.text = getString(R.string.update_checking)
+        UpdateManager.check(this, object : UpdateManager.Callback {
+            override fun onResult(info: UpdateManager.UpdateInfo?) {
+                runOnUiThread {
+                    UpdatePrefs(this@SettingsActivity).lastCheckTime = System.currentTimeMillis()
+                    if (info == null) {
+                        tvVersion.text = getString(R.string.update_latest)
+                        if (manual) Toast.makeText(this@SettingsActivity,
+                            R.string.update_latest, Toast.LENGTH_SHORT).show()
+                    } else {
+                        tvVersion.text = getString(R.string.update_found,
+                            info.versionName, info.versionCode)
+                        showUpdateDialog(info)
+                    }
+                }
+            }
+            override fun onError(msg: String) {
+                runOnUiThread {
+                    tvVersion.text = getString(R.string.update_check_failed,
+                        if (msg == "not_configured") getString(R.string.update_not_configured) else msg)
+                    if (manual) Toast.makeText(this@SettingsActivity,
+                        R.string.update_check_failed_short, Toast.LENGTH_SHORT).show()
+                }
+            }
+        })
+    }
+
+    private fun showUpdateDialog(info: UpdateManager.UpdateInfo) {
+        val progressTv = TextView(this).apply {
+            setPadding(48, 16, 48, 16)
+            text = getString(R.string.update_ready)
+        }
+        val dialog = AlertDialog.Builder(this)
+            .setTitle(getString(R.string.update_dialog_title, info.versionName))
+            .setMessage(info.changelog.ifBlank { getString(R.string.update_no_changelog) })
+            .setView(progressTv)
+            .setPositiveButton(R.string.update_now, null)
+            .setNegativeButton(R.string.update_later, null)
+            .create()
+        dialog.show()
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+            it.isEnabled = false
+            UpdateManager.download(this, info, object : UpdateManager.DownloadCallback {
+                override fun onProgress(percent: Int) {
+                    runOnUiThread {
+                        progressTv.text = getString(R.string.update_downloading, percent)
+                    }
+                }
+                override fun onDone(file: java.io.File) {
+                    runOnUiThread {
+                        dialog.dismiss()
+                        UpdateManager.install(this@SettingsActivity, file)
+                    }
+                }
+                override fun onError(msg: String) {
+                    runOnUiThread {
+                        it.isEnabled = true
+                        progressTv.text = getString(R.string.update_download_failed, msg)
+                    }
+                }
+            })
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // recreate() 后副标题刷新
+        tvLangSummary.text = LocaleHelper.getDisplayName(this)
+    }
+
+    private fun showLanguageDialog() {
+        val labels = arrayOf(
+            getString(R.string.lang_follow_system),
+            getString(R.string.lang_zh),
+            getString(R.string.lang_en)
+        )
+        val values = arrayOf(
+            LocaleHelper.LANG_SYSTEM,
+            LocaleHelper.LANG_ZH,
+            LocaleHelper.LANG_EN
+        )
+        val current = LocaleHelper.getLanguage(this)
+        var checked = values.indexOf(current)
+        if (checked < 0) checked = 0
+        AlertDialog.Builder(this)
+            .setTitle(R.string.dialog_language_title)
+            .setSingleChoiceItems(labels, checked) { dialog, which ->
+                LocaleHelper.setLanguage(this, values[which])
+                dialog.dismiss()
+                recreate()
+            }
+            .setNegativeButton(R.string.disconnect_cancel, null)
+            .show()
+    }
+
+    companion object {
+        private const val PREFS = "castlink_prefs"
+        private const val KEY_QUALITY = "quality"
+        private const val KEY_PREFER_5G = "prefer_5g"
+        private const val KEY_LEGACY_MODE = "legacy_mode"
+        private const val KEY_DEVICE_NAME = "device_name"
+        private const val QUALITY_AUTO = "auto"
+        private const val QUALITY_FLAGSHIP = "flagship"
+        private const val QUALITY_1080P = "1080p"
+        private const val QUALITY_720P = "720p"
+    }
+}

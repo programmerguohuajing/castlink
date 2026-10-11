@@ -1,0 +1,250 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- NEBULA 手机主页 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/bg_nebula"
+    android:orientation="vertical">
+
+    <!-- 顶栏 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:padding="20dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:letterSpacing="0.25"
+            android:text="CASTLINK"
+            android:textColor="@color/nebula_cyan"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tv_wifi_status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@color/nebula_text_2ry"
+            android:textSize="13sp" />
+    </LinearLayout>
+
+    <ViewFlipper
+        android:id="@+id/flipper"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <!-- 第 0 页：投屏 -->
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:padding="20dp">
+
+                <Button
+                    android:id="@+id/btn_start_cast"
+                    android:layout_width="match_parent"
+                    android:layout_height="60dp"
+                    android:background="@drawable/bg_neon_btn"
+                    android:text="@string/btn_start_cast"
+                    android:textColor="#050810"
+                    android:textSize="17sp"
+                    android:textStyle="bold" />
+
+                <Button
+                    android:id="@+id/btn_start_sender"
+                    android:layout_width="match_parent"
+                    android:layout_height="60dp"
+                    android:layout_marginTop="12dp"
+                    android:background="@drawable/bg_glass_card"
+                    android:text="@string/btn_start_sender"
+                    android:textColor="@color/nebula_cyan"
+                    android:textSize="17sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="20dp"
+                    android:letterSpacing="0.2"
+                    android:text="@string/devices_title"
+                    android:textColor="@color/nebula_text_3ry"
+                    android:textSize="13sp" />
+
+                <ListView
+                    android:id="@+id/lv_devices"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:layout_marginTop="8dp"
+                    android:divider="@android:color/transparent"
+                    android:dividerHeight="10dp" />
+            </LinearLayout>
+
+            <!-- 空态 -->
+            <LinearLayout
+                android:id="@+id/empty_view"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:padding="32dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/empty_title"
+                    android:textColor="@color/nebula_text"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="@string/empty_step1"
+                    android:textColor="@color/nebula_text_2ry"
+                    android:textSize="14sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="@string/empty_step2"
+                    android:textColor="@color/nebula_text_2ry"
+                    android:textSize="14sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="@string/empty_step3"
+                    android:textColor="@color/nebula_text_2ry"
+                    android:textSize="14sp" />
+
+                <Button
+                    android:id="@+id/btn_manual_ip"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:background="@drawable/bg_glass_card"
+                    android:text="@string/btn_manual_ip"
+                    android:textColor="@color/nebula_cyan" />
+            </LinearLayout>
+        </FrameLayout>
+
+        <!-- 第 1 页：媒体 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:padding="20dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:letterSpacing="0.2"
+                android:text="@string/tab_media"
+                android:textColor="@color/nebula_text_3ry"
+                android:textSize="13sp" />
+
+            <ListView
+                android:id="@+id/lv_media_files"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_marginTop="8dp"
+                android:divider="@android:color/transparent"
+                android:dividerHeight="10dp" />
+        </LinearLayout>
+
+        <!-- 第 2 页：我的 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:padding="20dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/mine_history_title"
+                android:textColor="@color/nebula_text"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/mine_history_empty"
+                android:textColor="@color/nebula_text_3ry"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/btn_open_settings"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="28dp"
+                android:background="@drawable/bg_glass_card"
+                android:text="@string/btn_settings"
+                android:textColor="@color/nebula_cyan"
+                android:textSize="16sp" />
+
+            <Button
+                android:id="@+id/btn_help"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="12dp"
+                android:background="@drawable/bg_glass_card"
+                android:text="@string/btn_help"
+                android:textColor="@color/nebula_cyan"
+                android:textSize="16sp" />
+        </LinearLayout>
+    </ViewFlipper>
+
+    <!-- 底部 Tab -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#CC0A1128"
+        android:orientation="horizontal"
+        android:padding="8dp">
+
+        <Button
+            android:id="@+id/tab_btn_cast"
+            android:layout_width="0dp"
+            android:layout_height="52dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_glass_card"
+            android:text="@string/tab_cast"
+            android:textColor="@color/nebula_cyan" />
+
+        <Button
+            android:id="@+id/tab_btn_media"
+            android:layout_width="0dp"
+            android:layout_height="52dp"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_glass_card"
+            android:text="@string/tab_media"
+            android:textColor="@color/nebula_text_2ry" />
+
+        <Button
+            android:id="@+id/tab_btn_mine"
+            android:layout_width="0dp"
+            android:layout_height="52dp"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_glass_card"
+            android:text="@string/tab_mine"
+            android:textColor="@color/nebula_text_2ry" />
+    </LinearLayout>
+</LinearLayout>

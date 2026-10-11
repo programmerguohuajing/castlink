@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">CastLink</string>
+
+    <!-- 底部 Tab -->
+    <string name="tab_cast">投屏</string>
+    <string name="tab_media">媒体</string>
+    <string name="tab_mine">我的</string>
+
+    <!-- 投屏页 -->
+    <string name="wifi_connected_ssid">Wi-Fi 已连接：%1$s</string>
+    <string name="wifi_disconnected">Wi-Fi 未连接</string>
+    <!-- v0.3.5：已连 Wi-Fi 但读不到 SSID（Android 10+ 无定位权限）时的退化显示 -->
+    <string name="wifi_connected">Wi-Fi 已连接</string>
+    <!-- v0.3.5：投放文件按类型打开 -->
+    <string name="install_apk_title">安装应用</string>
+    <string name="install_apk_msg">是否安装 %1$s？</string>
+    <string name="file_no_viewer">没有可打开此文件的应用</string>
+    <string name="btn_start_cast">开始投屏</string>
+    <string name="empty_title">未发现设备</string>
+    <string name="empty_step1">1. 确认手机与本机连接同一 Wi-Fi</string>
+    <string name="empty_step2">2. 在发送端 App 中使用扫码入口</string>
+    <string name="empty_step3">3. 或手动输入 IP 地址连接</string>
+    <string name="btn_scan_qr">扫码入口</string>
+    <string name="btn_manual_ip">手动输入 IP</string>
+    <string name="scan_toast">扫码功能开发中</string>
+    <string name="manual_ip_toast">手动输入 IP 开发中</string>
+    <!-- v0.3.11：手动输入 IP -->
+    <string name="manual_ip_title">输入接收端 IP</string>
+    <string name="manual_ip_hint">例如 192.168.1.100</string>
+    <string name="sender_manual_device">手动设备（%1$s）</string>
+    <string name="demo_device_1_name">客厅电视（演示）</string>
+    <string name="demo_device_2_name">卧室盒子（演示）</string>
+    <!-- v0.3.4：首页点设备时的意图选择 -->
+    <string name="device_action_cast">📤 投屏到此设备</string>
+    <string name="device_action_monitor">📊 打开监控页</string>
+    <!-- v0.3.6：崩溃上报 -->
+    <string name="crash_dialog_title">检测到上次崩溃</string>
+    <string name="crash_copy">复制堆栈</string>
+    <string name="crash_dismiss">关闭</string>
+    <string name="crash_copied">已复制到剪贴板</string>
+    <!-- v0.3.12：在线更新 -->
+    <string name="setting_update_title">在线更新</string>
+    <string name="update_owner_hint">GitHub 用户名（如 programmerguohuajing）</string>
+    <string name="update_repo_hint">仓库名（如 castlink-releases）</string>
+    <string name="update_mirror_label">下载镜像源</string>
+    <string name="btn_check_update">检查更新</string>
+    <string name="setting_auto_update">启动时自动检查更新（每天一次）</string>
+    <string name="update_cfg_saved">更新源已保存</string>
+    <string name="update_current_version">当前版本：%1$s（%2$d）</string>
+    <string name="update_checking">正在检查更新…</string>
+    <string name="update_latest">已是最新版本</string>
+    <string name="update_found">发现新版本：%1$s（%2$d）</string>
+    <string name="update_not_configured">请先填写 GitHub 用户名和仓库名</string>
+    <string name="update_check_failed">检查失败：%1$s</string>
+    <string name="update_check_failed_short">检查更新失败，请稍后重试</string>
+    <string name="update_dialog_title">发现新版本 %1$s</string>
+    <string name="update_no_changelog">暂无更新说明</string>
+    <string name="update_ready">点击"立即更新"开始下载</string>
+    <string name="update_now">立即更新</string>
+    <string name="update_later">稍后</string>
+    <string name="update_downloading">下载中… %1$d%%</string>
+    <string name="update_download_failed">下载失败：%1$s，可换镜像源重试</string>
+    <!-- v0.3.13 NEBULA -->
+    <string name="devices_title">附近的设备</string>
+    <!-- v0.3.10：原生协议投屏播放页 -->
+    <string name="stream_connecting">正在连接…</string>
+    <string name="stream_close">断开</string>
+
+    <!-- 设备列表项 -->
+    <string name="signal_level">信号：%1$s</string>
+    <string name="signal_strong">强</string>
+    <string name="signal_good">较好</string>
+    <string name="signal_fair">一般</string>
+    <string name="signal_weak">弱</string>
+    <string name="signal_none">无</string>
+    <string name="tier_flagship_badge">4K 120Hz</string>
+    <string name="tier_mainstream_badge">1080p 60Hz</string>
+    <string name="tier_legacy_badge">Legacy 720p</string>
+    <string name="tier_flagship_name">旗舰档</string>
+    <string name="tier_mainstream_name">主流档</string>
+    <string name="tier_legacy_name">传统档</string>
+    <string name="favorite_on">★</string>
+    <string name="favorite_off">☆</string>
+    <string name="favorite_desc">收藏该设备</string>
+
+    <!-- 媒体 / 我的页 -->
+    <string name="media_placeholder">文件投放（P1，未实现）</string>
+    <!-- v0.3.11：媒体页空状态 -->
+    <string name="media_empty">暂无收到的文件\n用另一台设备向本机投放文件后会显示在这里</string>
+    <string name="mine_history_title">历史设备</string>
+    <string name="mine_history_empty">暂无历史设备</string>
+    <string name="btn_settings">设置</string>
+    <string name="btn_help">帮助</string>
+    <string name="help_toast">帮助文档尚未完成</string>
+
+    <!-- 投屏控制页 -->
+    <string name="title_control">投屏控制</string>
+    <string name="control_status">目标设备：%1$s　档位：%2$s　管线延迟：%3$s</string>
+    <string name="unknown_value">--</string>
+    <string name="mode_game">游戏</string>
+    <string name="mode_cinema">影院</string>
+    <string name="mode_balanced">均衡</string>
+    <string name="panel_resolution">分辨率</string>
+    <string name="panel_framerate">帧率</string>
+    <string name="panel_bitrate">码率</string>
+    <string name="panel_latency">延迟</string>
+    <string name="btn_pause">暂停</string>
+    <string name="pause_toast">暂停功能开发中</string>
+    <string name="btn_disconnect">断开</string>
+    <string name="disconnect_title">确认断开</string>
+    <string name="disconnect_msg">确定要断开与 %1$s 的连接吗？</string>
+    <string name="disconnect_yes">断开</string>
+    <string name="disconnect_cancel">取消</string>
+    <string name="btn_loopback">运行本地回环自测</string>
+    <string name="loopback_running">自测运行中…</string>
+    <string name="loopback_result">解码%1$d帧，平均%2$d fps</string>
+    <string name="loopback_error">自测失败：%1$s</string>
+    <string name="loopback_resolution">%1$d×%2$d</string>
+
+    <!-- 待机页 -->
+    <string name="title_standby">待机投屏</string>
+    <string name="standby_waiting">等待连接</string>
+    <string name="standby_step1">1. 手机连入同一 Wi-Fi</string>
+    <string name="standby_step2">2. iPhone：控制中心 → 屏幕镜像；安卓：打开 CastLink 发送端</string>
+    <string name="standby_step3">3. 选择本设备，输入 4 位 PIN 完成配对</string>
+    <string name="standby_pin_hint">投屏 PIN（5 分钟刷新）</string>
+    <string name="airplay_pin_hint">AirPlay 配对 PIN（iPhone 输入）</string>
+    <string name="airplay_connected">AirPlay 已连接：%1$s</string>
+    <string name="airplay_error">AirPlay 异常</string>
+    <string name="standby_capability">最高 1080p 60fps</string>
+    <string name="qr_image_desc">投屏连接二维码</string>
+    <string name="qr_fallback">二维码生成失败，请手动输入 IP 连接</string>
+
+    <!-- 设置页 -->
+    <string name="title_settings">设置</string>
+    <string name="setting_language_title">语言 / Language</string>
+    <string name="dialog_language_title">选择语言 / Choose language</string>
+    <string name="lang_follow_system">跟随系统</string>
+    <string name="lang_zh">简体中文</string>
+    <string name="lang_en">English</string>
+    <string name="lang_name_zh">中文</string>
+    <string name="lang_name_en">English</string>
+    <string name="lang_name_separator"> · </string>
+    <string name="device_capability_title">本机能力</string>
+    <string name="device_capability_desc">旗舰档 · 最高 4K 120fps HEVC</string>
+    <string name="setting_quality_title">画质</string>
+    <string name="quality_auto">自动</string>
+    <string name="quality_flagship">4K120（旗舰限定）</string>
+    <string name="quality_1080p">1080p60</string>
+    <string name="quality_720p">720p30</string>
+    <string name="setting_prefer_5g">优先 5GHz</string>
+    <string name="setting_legacy_mode">Legacy Android 4 接收模式（限720p）</string>
+    <string name="setting_device_name">设备名</string>
+    <string name="device_name_hint">输入设备名</string>
+    <string name="btn_save">保存</string>
+    <string name="device_name_saved">设备名已保存</string>
+    <string name="default_device_name">CastLink-TV</string>
+
+    <!-- 发送端 -->
+    <string name="title_sender">发送端投屏</string>
+    <string name="btn_start_sender">把本机屏幕投出去</string>
+    <string name="sender_discovering">正在发现设备…</string>
+    <string name="sender_no_devices">未发现可投屏设备</string>
+    <string name="sender_pin_title">输入 %1$s 的接收 PIN</string>
+    <string name="sender_pin_hint">4 位 PIN</string>
+    <string name="sender_status_connecting">正在连接 %1$s…</string>
+    <string name="sender_status_started">正在投屏到 %1$s</string>
+    <string name="sender_status_pin_failed">PIN 错误，连接失败</string>
+    <string name="sender_status_stopped">投屏已停止</string>
+    <string name="sender_status_error">投屏出错：%1$s</string>
+    <string name="sender_capture_denied">未获得录屏授权</string>
+    <string name="sender_stop">停止投屏</string>
+    <string name="sender_notif_title">CastLink 正在投屏</string>
+    <string name="sender_notif_text">点击停止投屏</string>
+    <string name="sender_notif_channel">投屏状态</string>
+    <!-- v0.3.0：自有协议 PIN 锁定 / 待机降亮 / 文件投放 -->
+    <string name="pin_locked_hint">已锁定，请 %1$d 秒后重试或扫码</string>
+    <string name="file_push_hint">文件投放：http://%1$s:8756</string>
+    <string name="file_received_hint">已收到文件：%1$s（点击播放）</string>
+    <string name="player_title">文件播放</string>
+    <string name="player_empty">暂无收到的文件</string>
+    <string name="player_formats">支持：MP4(H.264) / 3GP / WebM(VP8·VP9) / MP3 / AAC / FLAC / WAV；MKV / HEVC 不保证可播</string>
+    <string name="player_audio_playing">正在播放音频：%1$s</string>
+    <string name="player_buffering">正在加载…</string>
+    <string name="player_completed">播放完毕</string>
+    <string name="player_error">无法播放该文件</string>
+    <string name="player_stop">停止</string>
+    <string name="btn_back">返回</string>
+    <string name="airplay_notif_channel">AirPlay</string>
+    <string name="airplay_notif_title">CastLink AirPlay</string>
+    <string name="airplay_notif_text">AirPlay 接收已开启</string>
+</resources>

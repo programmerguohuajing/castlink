@@ -1,0 +1,50 @@
+CastLink 第三方代码与依赖声明（v0.2.0）
+
+1. PhairPlay — Apache License 2.0
+   源码：https://github.com/mazer666/PhairPlay
+   移植范围（v0.2.0，包名 com.phairplay.* → com.castlink.receiver.airplay.*，
+   每个文件头均有移植声明）：
+     - airplay/ 全部：AirPlayReceiver（编排器）、RtspHandler（RTSP 握手 + PIN 配对）、
+       MdnsService（_airplay._tcp/_raop._tcp 广播）、VideoDecoder、AudioPlayer、
+       TimingHandler、RtpInterleaved、SdpParser、RtspMessages、RtspRequestReader、
+       StreamStats、DacpClient、NowPlayingInfo、PhotoHandler、AirPlayVideoPlayer
+     - airplay/handshake/ 全部：FairPlay（fp-setup/handshake 纯逻辑 + JNI 解密桥）、
+       PairingSession（X25519/Ed25519 配对）、PairingKeys、PairingStore
+       （prefs 文件名改为 castlink_pairings）、LegacyPairSetupPin（SRP PIN）、
+       PlistCodec、RaopRsa、MirrorCrypto、MirrorStreamServer、AudioStreamServer、
+       BufferedAudioServer、AirPlayNtpClient、InfoResponder、AlacDecoder
+     - util/：Base64Util、NetworkUtils、Logger（Timber 后端已替换为 android.util.Log）
+     - service/ServiceState.kt：仅取 ProtocolState 枚举（→ airplay/ProtocolState.kt）
+   未移植：ui/、settings/、miracast/、cast/、service/ 其余（PhairPlayService 等）。
+   Native：app/src/main/cpp 思想来源 RPiPlay 的 playfair C 实现，经 PhairPlay 的
+   fairplay_jni.c 桥接；本工程用 NDK r28c 自行编译出 libplayfair.so
+   （arm64-v8a / armeabi-v7a / x86_64 / x86），JNI 函数名已随包名改写。
+   License 全文见 PhairPlay 仓库 LICENSE（Apache-2.0）。
+
+2. BouncyCastle bcprov-jdk18on 1.78.1 — MIT License
+   用途：PairingSession/PairingKeys 的 X25519/Ed25519（AirPlay 配对）。
+   与 Apache-2.0 兼容。jar：~/toolchains/m2repo（Maven Central 拉取）。
+
+3. dd-plist 1.28 — MIT License
+   用途：PlistCodec 的 Apple binary/XML plist 编解码（AirPlay 2 握手）。
+   与 Apache-2.0 兼容。jar：~/toolchains/m2repo（Maven Central 拉取）。
+
+4. zxing core 3.5.3 — Apache License 2.0
+   用途：待机页二维码（v0.1.0 已有）。jar：~/toolchains/m2repo。
+
+5. kotlinx-coroutines-core-jvm / kotlinx-coroutines-android 1.6.4 — Apache License 2.0
+   用途：移植代码的协程（Dispatchers.IO/Main）。jar：~/toolchains/m2repo。
+
+6. Apple ALAC decoder（macosforge/alac）— Apache License 2.0
+   源码：https://github.com/macosforge/alac（commit c38887c，2026-10-11 拉取）
+   移植范围（v0.3.0）：仅取 codec/ 下的解码器部分（ALACDecoder.cpp/.h、
+   ALACBitUtilities.c/.h、ag_dec.c/aglib.h、dp_dec.c/dplib.h、
+   matrix_dec.c/matrixlib.h、EndianPortable.c/.h、ALACAudioTypes.h，
+   未取 _enc 编码器），源码原样置于 app/src/main/jni/alac/；
+   自研 JNI 桥 app/src/main/jni/alac/alac_jni.cpp（placement new，
+   无 libc++_shared 依赖）。本工程用 NDK r28c 自行编译出 libalac.so
+   （arm64-v8a / armeabi-v7a / x86_64 / x86），置于 app/src/main/jniLibs/。
+   用途：AirPlay 系统音频（ct=2 ALAC）软件解码（AudioStreamServer →
+   AlacDecoder → nativeDecode）。License 全文见仓库 LICENSE（Apache-2.0）。
+
+无 GPL 代码（UxPlay 系未查看未使用）。

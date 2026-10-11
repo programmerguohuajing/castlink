@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">CastLink</string>
+
+    <!-- Bottom tabs -->
+    <string name="tab_cast">Cast</string>
+    <string name="tab_media">Media</string>
+    <string name="tab_mine">Me</string>
+
+    <!-- Cast page -->
+    <string name="wifi_connected_ssid">Wi-Fi connected: %1$s</string>
+    <string name="wifi_disconnected">Wi-Fi not connected</string>
+    <!-- v0.3.5: fallback when Wi-Fi is up but SSID is unavailable (no location permission on Android 10+) -->
+    <string name="wifi_connected">Wi-Fi connected</string>
+    <!-- v0.3.5: open pushed files by type -->
+    <string name="install_apk_title">Install app</string>
+    <string name="install_apk_msg">Install %1$s?</string>
+    <string name="file_no_viewer">No app can open this file</string>
+    <string name="btn_start_cast">Start Casting</string>
+    <string name="empty_title">No devices found</string>
+    <string name="empty_step1">1. Make sure your phone and this device are on the same Wi-Fi</string>
+    <string name="empty_step2">2. Use the scan entry in the sender app</string>
+    <string name="empty_step3">3. Or connect by entering the IP address manually</string>
+    <string name="btn_scan_qr">Scan QR</string>
+    <string name="btn_manual_ip">Enter IP manually</string>
+    <string name="scan_toast">QR scan is coming soon</string>
+    <string name="manual_ip_toast">Manual IP entry is coming soon</string>
+    <!-- v0.3.11: manual IP -->
+    <string name="manual_ip_title">Enter receiver IP</string>
+    <string name="manual_ip_hint">e.g. 192.168.1.100</string>
+    <string name="sender_manual_device">Manual device (%1$s)</string>
+    <string name="demo_device_1_name">Living Room TV (demo)</string>
+    <string name="demo_device_2_name">Bedroom Box (demo)</string>
+    <!-- v0.3.4: intent chooser when tapping a device on the home page -->
+    <string name="device_action_cast">📤 Cast to this device</string>
+    <string name="device_action_monitor">📊 Open monitor</string>
+    <!-- v0.3.6: crash reporter -->
+    <string name="crash_dialog_title">Last crash detected</string>
+    <string name="crash_copy">Copy stack</string>
+    <string name="crash_dismiss">Dismiss</string>
+    <string name="crash_copied">Copied to clipboard</string>
+    <!-- v0.3.12: OTA update -->
+    <string name="setting_update_title">App updates</string>
+    <string name="update_owner_hint">GitHub username (e.g. programmerguohuajing)</string>
+    <string name="update_repo_hint">Repo name (e.g. castlink-releases)</string>
+    <string name="update_mirror_label">Download mirror</string>
+    <string name="btn_check_update">Check for updates</string>
+    <string name="setting_auto_update">Auto-check on launch (once a day)</string>
+    <string name="update_cfg_saved">Update source saved</string>
+    <string name="update_current_version">Current: %1$s (%2$d)</string>
+    <string name="update_checking">Checking for updates…</string>
+    <string name="update_latest">Already up to date</string>
+    <string name="update_found">New version: %1$s (%2$d)</string>
+    <string name="update_not_configured">Fill in GitHub username and repo first</string>
+    <string name="update_check_failed">Check failed: %1$s</string>
+    <string name="update_check_failed_short">Update check failed, try later</string>
+    <string name="update_dialog_title">New version %1$s</string>
+    <string name="update_no_changelog">No changelog</string>
+    <string name="update_ready">Tap "Update now" to download</string>
+    <string name="update_now">Update now</string>
+    <string name="update_later">Later</string>
+    <string name="update_downloading">Downloading… %1$d%%</string>
+    <string name="update_download_failed">Download failed: %1$s, try another mirror</string>
+    <!-- v0.3.13 NEBULA -->
+    <string name="devices_title">Nearby devices</string>
+    <!-- v0.3.10: native protocol stream player -->
+    <string name="stream_connecting">Connecting…</string>
+    <string name="stream_close">Disconnect</string>
+
+    <!-- Device list item -->
+    <string name="signal_level">Signal: %1$s</string>
+    <string name="signal_strong">Strong</string>
+    <string name="signal_good">Good</string>
+    <string name="signal_fair">Fair</string>
+    <string name="signal_weak">Weak</string>
+    <string name="signal_none">None</string>
+    <string name="tier_flagship_badge">4K 120Hz</string>
+    <string name="tier_mainstream_badge">1080p 60Hz</string>
+    <string name="tier_legacy_badge">Legacy 720p</string>
+    <string name="tier_flagship_name">Flagship</string>
+    <string name="tier_mainstream_name">Mainstream</string>
+    <string name="tier_legacy_name">Legacy</string>
+    <string name="favorite_on">★</string>
+    <string name="favorite_off">☆</string>
+    <string name="favorite_desc">Favorite this device</string>
+
+    <!-- Media / Me pages -->
+    <string name="media_placeholder">File casting (P1, not implemented)</string>
+    <!-- v0.3.11: media tab empty state -->
+    <string name="media_empty">No received files yet\nFiles cast to this device will appear here</string>
+    <string name="mine_history_title">Recent devices</string>
+    <string name="mine_history_empty">No recent devices</string>
+    <string name="btn_settings">Settings</string>
+    <string name="btn_help">Help</string>
+    <string name="help_toast">Help is not ready yet</string>
+
+    <!-- Cast control page -->
+    <string name="title_control">Cast Control</string>
+    <string name="control_status">Target: %1$s · Tier: %2$s · Latency: %3$s</string>
+    <string name="unknown_value">--</string>
+    <string name="mode_game">Game</string>
+    <string name="mode_cinema">Cinema</string>
+    <string name="mode_balanced">Balanced</string>
+    <string name="panel_resolution">Resolution</string>
+    <string name="panel_framerate">Frame rate</string>
+    <string name="panel_bitrate">Bitrate</string>
+    <string name="panel_latency">Latency</string>
+    <string name="btn_pause">Pause</string>
+    <string name="pause_toast">Pause is not implemented yet</string>
+    <string name="btn_disconnect">Disconnect</string>
+    <string name="disconnect_title">Confirm disconnect</string>
+    <string name="disconnect_msg">Disconnect from %1$s?</string>
+    <string name="disconnect_yes">Disconnect</string>
+    <string name="disconnect_cancel">Cancel</string>
+    <string name="btn_loopback">Run local loopback test</string>
+    <string name="loopback_running">Self-test running…</string>
+    <string name="loopback_result">Decoded %1$d frames, avg %2$d fps</string>
+    <string name="loopback_error">Self-test failed: %1$s</string>
+    <string name="loopback_resolution">%1$d×%2$d</string>
+
+    <!-- Standby page -->
+    <string name="title_standby">Standby Cast</string>
+    <string name="standby_waiting">Waiting for connection</string>
+    <string name="standby_step1">1. Join the same Wi-Fi on your phone</string>
+    <string name="standby_step2">2. iPhone: Control Center → Screen Mirroring; Android: open CastLink sender</string>
+    <string name="standby_step3">3. Select this device and enter the 4-digit PIN to pair</string>
+    <string name="standby_pin_hint">Cast PIN (refreshes every 5 min)</string>
+    <string name="airplay_pin_hint">AirPlay pairing PIN (enter on iPhone)</string>
+    <string name="airplay_connected">AirPlay connected: %1$s</string>
+    <string name="airplay_error">AirPlay error</string>
+    <string name="standby_capability">Up to 1080p 60fps</string>
+    <string name="qr_image_desc">Cast connection QR code</string>
+    <string name="qr_fallback">QR generation failed, please enter the IP manually</string>
+
+    <!-- Settings page -->
+    <string name="title_settings">Settings</string>
+    <string name="setting_language_title">语言 / Language</string>
+    <string name="dialog_language_title">选择语言 / Choose language</string>
+    <string name="lang_follow_system">Follow system</string>
+    <string name="lang_zh">简体中文</string>
+    <string name="lang_en">English</string>
+    <string name="lang_name_zh">Chinese</string>
+    <string name="lang_name_en">English</string>
+    <string name="lang_name_separator"> · </string>
+    <string name="device_capability_title">This device</string>
+    <string name="device_capability_desc">Flagship tier · up to 4K 120fps HEVC</string>
+    <string name="setting_quality_title">Quality</string>
+    <string name="quality_auto">Auto</string>
+    <string name="quality_flagship">4K120 (flagship only)</string>
+    <string name="quality_1080p">1080p60</string>
+    <string name="quality_720p">720p30</string>
+    <string name="setting_prefer_5g">Prefer 5 GHz</string>
+    <string name="setting_legacy_mode">Legacy Android 4 receive mode (720p max)</string>
+    <string name="setting_device_name">Device name</string>
+    <string name="device_name_hint">Enter device name</string>
+    <string name="btn_save">Save</string>
+    <string name="device_name_saved">Device name saved</string>
+    <string name="default_device_name">CastLink-TV</string>
+
+    <!-- Sender -->
+    <string name="title_sender">Cast Screen</string>
+    <string name="btn_start_sender">Cast This Screen</string>
+    <string name="sender_discovering">Discovering devices…</string>
+    <string name="sender_no_devices">No castable devices found</string>
+    <string name="sender_pin_title">Enter receiver PIN for %1$s</string>
+    <string name="sender_pin_hint">4-digit PIN</string>
+    <string name="sender_status_connecting">Connecting to %1$s…</string>
+    <string name="sender_status_started">Casting to %1$s</string>
+    <string name="sender_status_pin_failed">Wrong PIN, connection failed</string>
+    <string name="sender_status_stopped">Casting stopped</string>
+    <string name="sender_status_error">Cast error: %1$s</string>
+    <string name="sender_capture_denied">Screen capture permission denied</string>
+    <string name="sender_stop">Stop Casting</string>
+    <string name="sender_notif_title">CastLink is casting</string>
+    <string name="sender_notif_text">Tap to stop casting</string>
+    <string name="sender_notif_channel">Cast status</string>
+    <!-- v0.3.0: native-protocol PIN lockout / standby dimming / file push -->
+    <string name="pin_locked_hint">Locked — retry in %1$ds or scan the QR code</string>
+    <string name="file_push_hint">File push: http://%1$s:8756</string>
+    <string name="file_received_hint">Received: %1$s (tap to play)</string>
+    <string name="player_title">File Playback</string>
+    <string name="player_empty">No files received yet</string>
+    <string name="player_formats">Supported: MP4 (H.264) / 3GP / WebM (VP8·VP9) / MP3 / AAC / FLAC / WAV; MKV / HEVC not guaranteed</string>
+    <string name="player_audio_playing">Playing audio: %1$s</string>
+    <string name="player_buffering">Loading…</string>
+    <string name="player_completed">Playback finished</string>
+    <string name="player_error">Cannot play this file</string>
+    <string name="player_stop">Stop</string>
+    <string name="btn_back">Back</string>
+    <string name="airplay_notif_channel">AirPlay</string>
+    <string name="airplay_notif_title">CastLink AirPlay</string>
+    <string name="airplay_notif_text">AirPlay receiver is running</string>
+</resources>

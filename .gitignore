@@ -1,0 +1,24 @@
+# Build outputs
+build/
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# Gradle
+.gradle/
+gradle/wrapper/gradle-wrapper.jar
+local.properties
+
+# IDE
+.idea/
+*.iml
+.DS_Store
+
+# NDK intermediates
+*.o
+*.so.debug
+
+# Crash logs / temp
+*.log
+/tmp/
