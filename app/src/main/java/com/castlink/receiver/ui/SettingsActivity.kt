@@ -94,8 +94,6 @@ class SettingsActivity : BaseActivity() {
     private fun setupUpdateSection() {
         val updatePrefs = UpdatePrefs(this)
         val tvVersion = findViewById<TextView>(R.id.tv_update_version)
-        val etOwner = findViewById<EditText>(R.id.et_update_owner)
-        val etRepo = findViewById<EditText>(R.id.et_update_repo)
         val spMirror = findViewById<Spinner>(R.id.sp_update_mirror)
         val swAuto = findViewById<Switch>(R.id.sw_auto_update)
 
@@ -104,8 +102,6 @@ class SettingsActivity : BaseActivity() {
         val vc = if (Build.VERSION.SDK_INT >= 28) pkg.longVersionCode.toInt() else pkg.versionCode
         tvVersion.text = getString(R.string.update_current_version, pkg.versionName, vc)
 
-        etOwner.setText(updatePrefs.owner)
-        etRepo.setText(updatePrefs.repo)
         val mirrorNames = UpdateManager.MIRRORS.map { it.removePrefix("https://").removeSuffix("/") }
         spMirror.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, mirrorNames).apply {
             setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
@@ -115,8 +111,6 @@ class SettingsActivity : BaseActivity() {
         swAuto.setOnCheckedChangeListener { _, checked -> updatePrefs.autoCheck = checked }
 
         findViewById<Button>(R.id.btn_save_update_cfg).setOnClickListener {
-            updatePrefs.owner = etOwner.text.toString()
-            updatePrefs.repo = etRepo.text.toString()
             updatePrefs.mirrorIndex = spMirror.selectedItemPosition
             Toast.makeText(this, R.string.update_cfg_saved, Toast.LENGTH_SHORT).show()
         }

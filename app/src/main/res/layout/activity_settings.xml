@@ -164,23 +164,13 @@
             android:textColor="@color/text_secondary"
             android:textSize="14sp" />
 
-        <EditText
-            android:id="@+id/et_update_owner"
-            android:layout_width="match_parent"
+        <TextView
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:hint="@string/update_owner_hint"
-            android:inputType="text"
-            android:maxLines="1" />
-
-        <EditText
-            android:id="@+id/et_update_repo"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:hint="@string/update_repo_hint"
-            android:inputType="text"
-            android:maxLines="1" />
+            android:text="@string/update_source"
+            android:textColor="@color/text_secondary"
+            android:textSize="13sp" />
 
         <TextView
             android:layout_width="wrap_content"

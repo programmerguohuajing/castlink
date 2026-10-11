@@ -32,6 +32,10 @@ object UpdateManager {
         "https://mirror.ghproxy.com/"
     )
 
+    /** v0.3.17：官方更新源内置，不再需要用户手工填写 */
+    const val DEFAULT_OWNER = "programmerguohuajing"
+    const val DEFAULT_REPO = "castlink"
+
     data class UpdateInfo(
         val versionCode: Int,
         val versionName: String,

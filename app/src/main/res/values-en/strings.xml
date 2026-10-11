@@ -52,6 +52,8 @@
     <string name="update_latest">Already up to date</string>
     <string name="update_found">New version: %1$s (%2$d)</string>
     <string name="update_not_configured">Fill in GitHub username and repo first</string>
+    <!-- v0.3.17: built-in update source -->
+    <string name="update_source">Source: github.com/programmerguohuajing/castlink</string>
     <string name="update_check_failed">Check failed: %1$s</string>
     <string name="update_check_failed_short">Update check failed, try later</string>
     <string name="update_dialog_title">New version %1$s</string>

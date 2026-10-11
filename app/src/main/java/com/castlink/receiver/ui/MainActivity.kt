@@ -177,11 +177,10 @@ class MainActivity : BaseActivity() {
         autoCheckUpdate()
     }
 
-    /** v0.3.12：启动时自动检查更新（每天最多一次，需在设置页配置仓库） */
+    /** v0.3.12：启动时自动检查更新（每天最多一次） */
     private fun autoCheckUpdate() {
         val prefs = UpdatePrefs(this)
         if (!prefs.autoCheck) return
-        if (prefs.owner.isBlank() || prefs.repo.isBlank()) return
         if (System.currentTimeMillis() - prefs.lastCheckTime < 24 * 3600_000L) return
         prefs.lastCheckTime = System.currentTimeMillis()
         UpdateManager.check(this, object : UpdateManager.Callback {

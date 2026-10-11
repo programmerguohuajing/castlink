@@ -13,11 +13,11 @@ class UpdatePrefs(context: Context) {
     private val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
     var owner: String
-        get() = prefs.getString(KEY_OWNER, "").orEmpty()
+        get() = prefs.getString(KEY_OWNER, "").orEmpty().ifBlank { UpdateManager.DEFAULT_OWNER }
         set(v) = prefs.edit().putString(KEY_OWNER, v.trim()).apply()
 
     var repo: String
-        get() = prefs.getString(KEY_REPO, "").orEmpty()
+        get() = prefs.getString(KEY_REPO, "").orEmpty().ifBlank { UpdateManager.DEFAULT_REPO }
         set(v) = prefs.edit().putString(KEY_REPO, v.trim()).apply()
 
     var mirrorIndex: Int
