@@ -237,6 +237,8 @@ class AirPlayReceiver(
     }
 
     private fun startRtspHandler() {
+        // v0.1.1 (issue #1)：读取可信局域网跳过配对校验开关
+        val skipPairVerify = AirPlayPrefs(context).skipPairVerify
         rtspHandler = RtspHandler(
             context = context,
             displayWidth = mirrorWidth,
@@ -272,6 +274,7 @@ class AirPlayReceiver(
             onPlaybackInfo = { urlVideoPlayer?.info() },
             onRemoteControlInfo = { dacpId, activeRemote -> dacpClient.configure(dacpId, activeRemote) },
             pinAuthEnabled = pinAuthEnabled,
+            skipPairVerify = skipPairVerify,
             pairingStore = pairingStore,
             onShowPin = { pin -> onPinChanged(pin) }
         ).also { it.start(scope) }

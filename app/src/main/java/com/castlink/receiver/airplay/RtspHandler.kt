@@ -75,6 +75,11 @@ open class RtspHandler(
     private val onRemoteControlInfo: (dacpId: String?, activeRemote: String?) -> Unit = { _, _ -> },
     /** When true, require HomeKit-style SRP PIN pairing before streaming (gated by AppSettings). */
     private val pinAuthEnabled: Boolean = false,
+    /**
+     * v0.1.1 (issue #1)：可信局域网跳过 pair-verify 的 PIN 前置校验。
+     * 当配对缓存损坏导致握手后 MAC 校验失败时，打开此开关可绕过。
+     */
+    private val skipPairVerify: Boolean = false,
     /** Persistent store of paired controllers' Ed25519 keys (for pair-verify). */
     private val pairingStore: com.castlink.receiver.airplay.handshake.PairingStore? = null,
     /** Shows ([pin]) or hides (null) the on-screen pairing PIN during SRP pair-setup. */
@@ -514,9 +519,13 @@ open class RtspHandler(
     private fun handlePairVerify(request: RtspRequest): RtspResponse {
         // PIN access control: refuse pair-verify until the controller has PIN-paired this connection.
         // macOS responds to the rejection by starting the PIN flow (/pair-pin-start → /pair-setup-pin).
-        if (pinAuthEnabled && !pinPaired) {
+        // v0.1.1 (issue #1)：可信局域网可跳过此校验（配对缓存损坏时的逃生通道）。
+        if (pinAuthEnabled && !pinPaired && !skipPairVerify) {
             Logger.i("pair-verify rejected — PIN pairing required first (triggers /pair-pin-start)")
             return RtspResponse(470, "Connection Authorization Required", protocol = request.responseProtocol())
+        }
+        if (skipPairVerify && pinAuthEnabled && !pinPaired) {
+            Logger.i("pair-verify PIN check skipped (trusted LAN mode)")
         }
         return try {
             val body = pairingSession!!.pairVerify(request.bodyBytes)

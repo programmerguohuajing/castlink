@@ -88,6 +88,25 @@ class SettingsActivity : BaseActivity() {
 
         // v0.3.12：在线更新
         setupUpdateSection()
+
+        // v0.1.1 (issue #1)：AirPlay 配对
+        setupAirPlaySection()
+    }
+
+    /** v0.1.1 (issue #1)：可信局域网跳过配对校验 + 清除已配对设备 */
+    private fun setupAirPlaySection() {
+        val airPlayPrefs = com.castlink.receiver.airplay.AirPlayPrefs(this)
+        val swSkip = findViewById<Switch>(R.id.sw_skip_pair_verify)
+        swSkip.isChecked = airPlayPrefs.skipPairVerify
+        swSkip.setOnCheckedChangeListener { _, checked ->
+            airPlayPrefs.skipPairVerify = checked
+            Toast.makeText(this, R.string.update_cfg_saved, Toast.LENGTH_SHORT).show()
+        }
+        findViewById<Button>(R.id.btn_clear_pairings).setOnClickListener {
+            // 清除所有已配对设备的 LTPK（castlink_pairings prefs）
+            getSharedPreferences("castlink_pairings", MODE_PRIVATE).edit().clear().apply()
+            Toast.makeText(this, R.string.pairings_cleared, Toast.LENGTH_LONG).show()
+        }
     }
 
     /** v0.3.12：更新源配置 + 检查更新 + 下载安装 */

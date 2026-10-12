@@ -54,6 +54,12 @@
     <string name="update_not_configured">请先填写 GitHub 用户名和仓库名</string>
     <!-- v0.3.17：更新源内置 -->
     <string name="update_source">更新源：github.com/programmerguohuajing/castlink</string>
+    <!-- v0.1.1 (issue #1)：AirPlay 配对 -->
+    <string name="setting_airplay_title">AirPlay 配对</string>
+    <string name="setting_skip_pair_verify">可信局域网：跳过配对校验</string>
+    <string name="setting_skip_pair_verify_desc">仅在自家可信网络开启。配对缓存损坏导致连接失败时的逃生开关。</string>
+    <string name="btn_clear_pairings">清除已配对设备</string>
+    <string name="pairings_cleared">已配对设备已清除，下次连接需重新输入 PIN</string>
     <string name="update_check_failed">检查失败：%1$s</string>
     <string name="update_check_failed_short">检查更新失败，请稍后重试</string>
     <string name="update_dialog_title">发现新版本 %1$s</string>

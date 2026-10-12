@@ -54,6 +54,12 @@
     <string name="update_not_configured">Fill in GitHub username and repo first</string>
     <!-- v0.3.17: built-in update source -->
     <string name="update_source">Source: github.com/programmerguohuajing/castlink</string>
+    <!-- v0.1.1 (issue #1): AirPlay pairing -->
+    <string name="setting_airplay_title">AirPlay Pairing</string>
+    <string name="setting_skip_pair_verify">Trusted LAN: skip pair verification</string>
+    <string name="setting_skip_pair_verify_desc">Only for your own trusted network. Escape hatch when corrupted pairing cache breaks connections.</string>
+    <string name="btn_clear_pairings">Clear paired devices</string>
+    <string name="pairings_cleared">Paired devices cleared — PIN required on next connection</string>
     <string name="update_check_failed">Check failed: %1$s</string>
     <string name="update_check_failed_short">Update check failed, try later</string>
     <string name="update_dialog_title">New version %1$s</string>

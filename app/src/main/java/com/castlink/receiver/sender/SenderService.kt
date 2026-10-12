@@ -46,14 +46,20 @@ class SenderService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // v0.1.1 (issue #1)：ACTION_STOP 经通知栏 PendingIntent.getService 发出，
+        // 走的是 startService() 而非 startForegroundService()，没有 FGS 超时要求。
+        // 必须在 startForegroundCompat() 之前处理：Android 14+（尤其 15/16）上，
+        // 以 MEDIA_PROJECTION 类型 startForeground 需要有效的录屏授权，
+        // 停止时授权已释放/正在释放 → SecurityException 直接崩溃。
+        if (intent?.action == ACTION_STOP) {
+            stopCasting()
+            stopSelf()
+            return START_NOT_STICKY
+        }
         // v0.3.9：startForeground 必须在任何 early return 之前调用——否则
         // startForegroundService 后只调 stopSelf() 会触发
         // ForegroundServiceDidNotStartInTimeException（Fold3 实测）。
         startForegroundCompat(buildNotification())
-        if (intent?.action == ACTION_STOP) {
-            stopCasting()
-            return START_NOT_STICKY
-        }
         if (running.get()) return START_STICKY
 
         val targetIp = intent?.getStringExtra(EXTRA_TARGET_IP).orEmpty()

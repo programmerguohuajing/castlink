@@ -146,6 +146,39 @@
             android:layout_marginTop="8dp"
             android:text="@string/btn_save" />
 
+        <!-- v0.1.1 (issue #1)：AirPlay 配对 -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="@string/setting_airplay_title"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:textColor="@color/nebula_cyan" />
+
+        <Switch
+            android:id="@+id/sw_skip_pair_verify"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/setting_skip_pair_verify"
+            android:textSize="14sp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="@string/setting_skip_pair_verify_desc"
+            android:textColor="@color/text_secondary"
+            android:textSize="13sp" />
+
+        <Button
+            android:id="@+id/btn_clear_pairings"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/btn_clear_pairings" />
+
         <!-- v0.3.12：在线更新 -->
         <TextView
             android:layout_width="wrap_content"
