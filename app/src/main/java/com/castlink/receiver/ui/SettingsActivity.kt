@@ -65,12 +65,19 @@ class SettingsActivity : BaseActivity() {
         swPrefer5g.setOnCheckedChangeListener { _, isChecked ->
             prefs.edit().putBoolean(KEY_PREFER_5G, isChecked).apply()
         }
+        // TV 遥控器：行容器聚焦，点击整行切换开关
+        findViewById<android.view.View>(R.id.row_prefer_5g).setOnClickListener {
+            swPrefer5g.isChecked = !swPrefer5g.isChecked
+        }
 
         // Legacy Android 4 接收模式（限 720p），主线包内开关占位（持久化）
         val swLegacy = findViewById<Switch>(R.id.sw_legacy_mode)
         swLegacy.isChecked = prefs.getBoolean(KEY_LEGACY_MODE, false)
         swLegacy.setOnCheckedChangeListener { _, isChecked ->
             prefs.edit().putBoolean(KEY_LEGACY_MODE, isChecked).apply()
+        }
+        findViewById<android.view.View>(R.id.row_legacy_mode).setOnClickListener {
+            swLegacy.isChecked = !swLegacy.isChecked
         }
 
         // 设备名（持久化，供 mDNS 广播用）
@@ -102,6 +109,10 @@ class SettingsActivity : BaseActivity() {
             airPlayPrefs.skipPairVerify = checked
             Toast.makeText(this, R.string.update_cfg_saved, Toast.LENGTH_SHORT).show()
         }
+        // TV 遥控器：行容器聚焦，点击整行切换开关
+        findViewById<android.view.View>(R.id.row_skip_pair_verify).setOnClickListener {
+            swSkip.isChecked = !swSkip.isChecked
+        }
         findViewById<Button>(R.id.btn_clear_pairings).setOnClickListener {
             // 清除所有已配对设备的 LTPK（castlink_pairings prefs）
             getSharedPreferences("castlink_pairings", MODE_PRIVATE).edit().clear().apply()
@@ -128,6 +139,10 @@ class SettingsActivity : BaseActivity() {
         spMirror.setSelection(updatePrefs.mirrorIndex.coerceIn(mirrorNames.indices))
         swAuto.isChecked = updatePrefs.autoCheck
         swAuto.setOnCheckedChangeListener { _, checked -> updatePrefs.autoCheck = checked }
+        // TV 遥控器：行容器聚焦，点击整行切换开关
+        findViewById<android.view.View>(R.id.row_auto_update).setOnClickListener {
+            swAuto.isChecked = !swAuto.isChecked
+        }
 
         findViewById<Button>(R.id.btn_save_update_cfg).setOnClickListener {
             updatePrefs.mirrorIndex = spMirror.selectedItemPosition
