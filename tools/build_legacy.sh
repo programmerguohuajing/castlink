@@ -110,6 +110,7 @@ fi
 "$BT/apksigner" sign \
   --ks "$KS" --ks-pass pass:android --key-pass pass:android \
   --v1-signing-enabled true --v2-signing-enabled false \
+  --v3-signing-enabled false --v4-signing-enabled false \
   --out "$PROJ/$APK_NAME" "$OUT/app-aligned.apk"
 
 echo "=== 完成：$PROJ/$APK_NAME ==="
