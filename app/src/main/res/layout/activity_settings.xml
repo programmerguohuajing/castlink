@@ -107,6 +107,10 @@
 
         <!-- 开关项 -->
         <Switch
+            android:focusable="true"
+            android:focusableInTouchMode="true"
+            android:background="@drawable/bg_glass_btn"
+            android:padding="8dp"
             android:id="@+id/sw_prefer_5g"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -114,6 +118,10 @@
             android:text="@string/setting_prefer_5g" />
 
         <Switch
+            android:focusable="true"
+            android:focusableInTouchMode="true"
+            android:background="@drawable/bg_glass_btn"
+            android:padding="8dp"
             android:id="@+id/sw_legacy_mode"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -144,6 +152,8 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
+            android:background="@drawable/bg_neon_btn"
+            android:textColor="@color/white"
             android:text="@string/btn_save" />
 
         <!-- v0.1.1 (issue #1)：AirPlay 配对 -->
@@ -157,6 +167,10 @@
             android:textColor="@color/nebula_cyan" />
 
         <Switch
+            android:focusable="true"
+            android:focusableInTouchMode="true"
+            android:background="@drawable/bg_glass_btn"
+            android:padding="8dp"
             android:id="@+id/sw_skip_pair_verify"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -235,10 +249,16 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="8dp"
+                android:background="@drawable/bg_neon_btn"
+                android:textColor="@color/white"
                 android:text="@string/btn_save" />
         </LinearLayout>
 
         <Switch
+            android:focusable="true"
+            android:focusableInTouchMode="true"
+            android:background="@drawable/bg_glass_btn"
+            android:padding="8dp"
             android:id="@+id/sw_auto_update"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
