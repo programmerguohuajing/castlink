@@ -59,25 +59,28 @@ class SettingsActivity : BaseActivity() {
             prefs.edit().putString(KEY_QUALITY, value).apply()
         }
 
-        // 优先 5GHz（持久化）
-        val swPrefer5g = findViewById<Switch>(R.id.sw_prefer_5g)
-        swPrefer5g.isChecked = prefs.getBoolean(KEY_PREFER_5G, false)
-        swPrefer5g.setOnCheckedChangeListener { _, isChecked ->
-            prefs.edit().putBoolean(KEY_PREFER_5G, isChecked).apply()
+        // 优先 5GHz（持久化）——TV 遥控器用 Button 开关
+        val btnPrefer5g = findViewById<Button>(R.id.btn_prefer_5g)
+        fun refreshPrefer5g() {
+            val on = prefs.getBoolean(KEY_PREFER_5G, false)
+            btnPrefer5g.text = getString(R.string.setting_prefer_5g) + "：" + getString(if (on) R.string.on else R.string.off)
         }
-        // TV 遥控器：行容器聚焦，点击整行切换开关
-        findViewById<android.view.View>(R.id.row_prefer_5g).setOnClickListener {
-            swPrefer5g.isChecked = !swPrefer5g.isChecked
+        refreshPrefer5g()
+        btnPrefer5g.setOnClickListener {
+            prefs.edit().putBoolean(KEY_PREFER_5G, !prefs.getBoolean(KEY_PREFER_5G, false)).apply()
+            refreshPrefer5g()
         }
 
-        // Legacy Android 4 接收模式（限 720p），主线包内开关占位（持久化）
-        val swLegacy = findViewById<Switch>(R.id.sw_legacy_mode)
-        swLegacy.isChecked = prefs.getBoolean(KEY_LEGACY_MODE, false)
-        swLegacy.setOnCheckedChangeListener { _, isChecked ->
-            prefs.edit().putBoolean(KEY_LEGACY_MODE, isChecked).apply()
+        // Legacy Android 4 接收模式（限 720p）——TV 遥控器用 Button 开关
+        val btnLegacy = findViewById<Button>(R.id.btn_legacy_mode)
+        fun refreshLegacy() {
+            val on = prefs.getBoolean(KEY_LEGACY_MODE, false)
+            btnLegacy.text = getString(R.string.setting_legacy_mode) + "：" + getString(if (on) R.string.on else R.string.off)
         }
-        findViewById<android.view.View>(R.id.row_legacy_mode).setOnClickListener {
-            swLegacy.isChecked = !swLegacy.isChecked
+        refreshLegacy()
+        btnLegacy.setOnClickListener {
+            prefs.edit().putBoolean(KEY_LEGACY_MODE, !prefs.getBoolean(KEY_LEGACY_MODE, false)).apply()
+            refreshLegacy()
         }
 
         // 设备名（持久化，供 mDNS 广播用）
@@ -103,15 +106,15 @@ class SettingsActivity : BaseActivity() {
     /** v0.1.1 (issue #1)：可信局域网跳过配对校验 + 清除已配对设备 */
     private fun setupAirPlaySection() {
         val airPlayPrefs = com.castlink.receiver.airplay.AirPlayPrefs(this)
-        val swSkip = findViewById<Switch>(R.id.sw_skip_pair_verify)
-        swSkip.isChecked = airPlayPrefs.skipPairVerify
-        swSkip.setOnCheckedChangeListener { _, checked ->
-            airPlayPrefs.skipPairVerify = checked
-            Toast.makeText(this, R.string.update_cfg_saved, Toast.LENGTH_SHORT).show()
+        val btnSkip = findViewById<Button>(R.id.btn_skip_pair_verify)
+        fun refreshSkip() {
+            btnSkip.text = getString(R.string.setting_skip_pair_verify) + "：" + getString(if (airPlayPrefs.skipPairVerify) R.string.on else R.string.off)
         }
-        // TV 遥控器：行容器聚焦，点击整行切换开关
-        findViewById<android.view.View>(R.id.row_skip_pair_verify).setOnClickListener {
-            swSkip.isChecked = !swSkip.isChecked
+        refreshSkip()
+        btnSkip.setOnClickListener {
+            airPlayPrefs.skipPairVerify = !airPlayPrefs.skipPairVerify
+            refreshSkip()
+            Toast.makeText(this, R.string.update_cfg_saved, Toast.LENGTH_SHORT).show()
         }
         findViewById<Button>(R.id.btn_clear_pairings).setOnClickListener {
             // 清除所有已配对设备的 LTPK（castlink_pairings prefs）
@@ -125,7 +128,6 @@ class SettingsActivity : BaseActivity() {
         val updatePrefs = UpdatePrefs(this)
         val tvVersion = findViewById<TextView>(R.id.tv_update_version)
         val spMirror = findViewById<Spinner>(R.id.sp_update_mirror)
-        val swAuto = findViewById<Switch>(R.id.sw_auto_update)
 
         val pkg = packageManager.getPackageInfo(packageName, 0)
         @Suppress("DEPRECATION")
@@ -137,11 +139,14 @@ class SettingsActivity : BaseActivity() {
             setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         }
         spMirror.setSelection(updatePrefs.mirrorIndex.coerceIn(mirrorNames.indices))
-        swAuto.isChecked = updatePrefs.autoCheck
-        swAuto.setOnCheckedChangeListener { _, checked -> updatePrefs.autoCheck = checked }
-        // TV 遥控器：行容器聚焦，点击整行切换开关
-        findViewById<android.view.View>(R.id.row_auto_update).setOnClickListener {
-            swAuto.isChecked = !swAuto.isChecked
+        val btnAuto = findViewById<Button>(R.id.btn_auto_update)
+        fun refreshAuto() {
+            btnAuto.text = getString(R.string.setting_auto_update) + "：" + getString(if (updatePrefs.autoCheck) R.string.on else R.string.off)
+        }
+        refreshAuto()
+        btnAuto.setOnClickListener {
+            updatePrefs.autoCheck = !updatePrefs.autoCheck
+            refreshAuto()
         }
 
         findViewById<Button>(R.id.btn_save_update_cfg).setOnClickListener {

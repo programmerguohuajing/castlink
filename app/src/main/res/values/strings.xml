@@ -218,4 +218,6 @@
     <string name="airplay_notif_channel">AirPlay</string>
     <string name="airplay_notif_title">CastLink AirPlay</string>
     <string name="airplay_notif_text">AirPlay 接收已开启</string>
+    <string name="on">开</string>
+    <string name="off">关</string>
 </resources>

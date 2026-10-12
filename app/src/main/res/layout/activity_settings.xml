@@ -106,43 +106,23 @@
         </RadioGroup>
 
         <!-- 开关项 -->
-        <LinearLayout
-            android:id="@+id/row_prefer_5g"
+        <Button
+            android:id="@+id/btn_prefer_5g"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:focusable="true"
-            android:clickable="true"
             android:background="@drawable/bg_glass_btn"
-            android:padding="4dp"
-            android:orientation="vertical">
-            <Switch
-            android:focusable="false"
-            android:clickable="false"
-            android:id="@+id/sw_prefer_5g"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="@string/setting_prefer_5g" />
-        </LinearLayout>
+            android:textColor="@color/nebula_text"
+            android:gravity="start|center_vertical"
+            android:padding="12dp" />
 
-        <LinearLayout
-            android:id="@+id/row_legacy_mode"
+        <Button
+            android:id="@+id/btn_legacy_mode"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:focusable="true"
-            android:clickable="true"
             android:background="@drawable/bg_glass_btn"
-            android:padding="4dp"
-            android:orientation="vertical">
-            <Switch
-            android:focusable="false"
-            android:clickable="false"
-            android:id="@+id/sw_legacy_mode"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="@string/setting_legacy_mode" />
-        </LinearLayout>
+            android:textColor="@color/nebula_text"
+            android:gravity="start|center_vertical"
+            android:padding="12dp" />
 
         <!-- 设备名 -->
         <TextView
@@ -182,25 +162,14 @@
             android:textStyle="bold"
             android:textColor="@color/nebula_cyan" />
 
-        <LinearLayout
-            android:id="@+id/row_skip_pair_verify"
+        <Button
+            android:id="@+id/btn_skip_pair_verify"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:focusable="true"
-            android:clickable="true"
             android:background="@drawable/bg_glass_btn"
-            android:padding="4dp"
-            android:orientation="vertical">
-            <Switch
-            android:focusable="false"
-            android:clickable="false"
-            android:id="@+id/sw_skip_pair_verify"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="@string/setting_skip_pair_verify"
-            android:textSize="14sp" />
-        </LinearLayout>
+            android:textColor="@color/nebula_text"
+            android:gravity="start|center_vertical"
+            android:padding="12dp" />
 
         <TextView
             android:layout_width="wrap_content"
@@ -278,23 +247,13 @@
                 android:text="@string/btn_save" />
         </LinearLayout>
 
-        <LinearLayout
-            android:id="@+id/row_auto_update"
+        <Button
+            android:id="@+id/btn_auto_update"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:focusable="true"
-            android:clickable="true"
             android:background="@drawable/bg_glass_btn"
-            android:padding="4dp"
-            android:orientation="vertical">
-            <Switch
-            android:focusable="false"
-            android:clickable="false"
-            android:id="@+id/sw_auto_update"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="@string/setting_auto_update" />
-        </LinearLayout>
+            android:textColor="@color/nebula_text"
+            android:gravity="start|center_vertical"
+            android:padding="12dp" />
     </LinearLayout>
 </ScrollView>
