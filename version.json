@@ -1,1 +1,1 @@
-{"_comment":"CastLink 在线更新描述文件。App 经 jsDelivr 拉取，APK 经国内镜像下载。","apkUrl":"https://github.com/programmerguohuajing/castlink/releases/download/v0.1.9/CastLink-v0.1.9.apk","changelog":"v0.1.9\n- TV 遥控器：设置页开关改用 Button 样式，方向键可聚焦切换","versionCode":30,"versionName":"0.1.9"}
+{"_comment":"CastLink 在线更新描述文件。App 经 jsDelivr 拉取，APK 经国内镜像下载。","apkUrl":"https://github.com/programmerguohuajing/castlink/releases/download/v0.1.10/CastLink-v0.1.10.apk","changelog":"v0.1.10\n- 首页附近设备：本机过滤改用所有 IP 集合比对，修复 Fold3 上过滤失效","versionCode":31,"versionName":"0.1.10"}
