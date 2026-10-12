@@ -108,9 +108,6 @@
         <!-- 开关项 -->
         <Switch
             android:focusable="true"
-            android:focusableInTouchMode="true"
-            android:background="@drawable/bg_glass_btn"
-            android:padding="8dp"
             android:id="@+id/sw_prefer_5g"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -119,9 +116,6 @@
 
         <Switch
             android:focusable="true"
-            android:focusableInTouchMode="true"
-            android:background="@drawable/bg_glass_btn"
-            android:padding="8dp"
             android:id="@+id/sw_legacy_mode"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -168,9 +162,6 @@
 
         <Switch
             android:focusable="true"
-            android:focusableInTouchMode="true"
-            android:background="@drawable/bg_glass_btn"
-            android:padding="8dp"
             android:id="@+id/sw_skip_pair_verify"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -256,9 +247,6 @@
 
         <Switch
             android:focusable="true"
-            android:focusableInTouchMode="true"
-            android:background="@drawable/bg_glass_btn"
-            android:padding="8dp"
             android:id="@+id/sw_auto_update"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
