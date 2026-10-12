@@ -10,7 +10,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="28dp">
+    android:padding="48dp">
 
     <!-- 顶栏：玻璃胶囊 -->
     <LinearLayout

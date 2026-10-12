@@ -64,7 +64,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="60dp"
                     android:layout_marginTop="12dp"
-                    android:background="@drawable/bg_glass_card"
+                    android:background="@drawable/bg_glass_btn"
                     android:text="@string/btn_start_sender"
                     android:textColor="@color/nebula_cyan"
                     android:textSize="17sp" />
@@ -135,7 +135,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="16dp"
-                    android:background="@drawable/bg_glass_card"
+                    android:background="@drawable/bg_glass_btn"
                     android:text="@string/btn_manual_ip"
                     android:textColor="@color/nebula_cyan" />
             </LinearLayout>
@@ -193,7 +193,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="56dp"
                 android:layout_marginTop="28dp"
-                android:background="@drawable/bg_glass_card"
+                android:background="@drawable/bg_glass_btn"
                 android:text="@string/btn_settings"
                 android:textColor="@color/nebula_cyan"
                 android:textSize="16sp" />
@@ -203,7 +203,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="56dp"
                 android:layout_marginTop="12dp"
-                android:background="@drawable/bg_glass_card"
+                android:background="@drawable/bg_glass_btn"
                 android:text="@string/btn_help"
                 android:textColor="@color/nebula_cyan"
                 android:textSize="16sp" />
@@ -223,7 +223,7 @@
             android:layout_width="0dp"
             android:layout_height="52dp"
             android:layout_weight="1"
-            android:background="@drawable/bg_glass_card"
+            android:background="@drawable/bg_glass_btn"
             android:text="@string/tab_cast"
             android:textColor="@color/nebula_cyan" />
 
@@ -233,7 +233,7 @@
             android:layout_height="52dp"
             android:layout_marginStart="8dp"
             android:layout_weight="1"
-            android:background="@drawable/bg_glass_card"
+            android:background="@drawable/bg_glass_btn"
             android:text="@string/tab_media"
             android:textColor="@color/nebula_text_2ry" />
 
@@ -243,7 +243,7 @@
             android:layout_height="52dp"
             android:layout_marginStart="8dp"
             android:layout_weight="1"
-            android:background="@drawable/bg_glass_card"
+            android:background="@drawable/bg_glass_btn"
             android:text="@string/tab_mine"
             android:textColor="@color/nebula_text_2ry" />
     </LinearLayout>

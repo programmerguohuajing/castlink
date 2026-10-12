@@ -10,6 +10,19 @@
             <corners android:radius="16dp" />
         </shape>
     </item>
+    <!-- TV 遥控器 D-pad 焦点：高亮描边 -->
+    <item android:state_focused="true">
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="0"
+                android:startColor="#00E5FF"
+                android:endColor="#0097B9" />
+            <stroke
+                android:width="3dp"
+                android:color="#FFFFFF" />
+            <corners android:radius="16dp" />
+        </shape>
+    </item>
     <item>
         <shape android:shape="rectangle">
             <gradient

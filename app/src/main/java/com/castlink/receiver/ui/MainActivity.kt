@@ -73,6 +73,8 @@ class MainActivity : BaseActivity() {
         tabMedia.setOnClickListener { selectTab(1) }
         tabMine.setOnClickListener { selectTab(2) }
         selectTab(0)
+        // TV 遥控器：默认聚焦第一个按钮，打开即有可见焦点
+        tabCast.post { tabCast.requestFocus() }
 
         findViewById<Button>(R.id.btn_start_cast).setOnClickListener {
             startActivity(Intent(this, StandbyActivity::class.java))
@@ -106,7 +108,11 @@ class MainActivity : BaseActivity() {
             startActivity(Intent(this, SettingsActivity::class.java))
         }
         findViewById<Button>(R.id.btn_help).setOnClickListener {
-            Toast.makeText(this, R.string.help_toast, Toast.LENGTH_SHORT).show()
+            AlertDialog.Builder(this)
+                .setTitle(R.string.help_title)
+                .setMessage(R.string.help_content)
+                .setPositiveButton(android.R.string.ok, null)
+                .show()
         }
 
         deviceAdapter = DeviceAdapter()

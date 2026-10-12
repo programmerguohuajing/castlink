@@ -100,7 +100,27 @@
     <string name="mine_history_empty">暂无历史设备</string>
     <string name="btn_settings">设置</string>
     <string name="btn_help">帮助</string>
-    <string name="help_toast">帮助文档尚未完成</string>
+    <string name="help_title">使用帮助</string>
+    <string name="help_content">【作为接收端（电视/平板）】
+1. 打开 CastLink，进入待机页
+2. 记住屏幕上的 4 位 PIN 码（每 5 分钟刷新）
+3. 保持本页在前台，等待发送端连接
+
+【作为发送端（手机）】
+1. 确保与接收端在同一 Wi-Fi
+2. 首页选择附近的设备，输入接收端的 4 位 PIN
+3. 允许录屏权限后开始投屏
+
+【iPhone 投屏】
+控制中心 → 屏幕镜像 → 选择 CastLink-TV，输入 PIN
+
+【文件投放】
+浏览器访问待机页显示的地址（如 http://192.168.1.x:8756），上传文件
+
+【常见问题】
+• 搜不到设备：检查是否同一 Wi-Fi，尝试手动输入 IP
+• PIN 错误：PIN 每 5 分钟刷新，请看接收端当前显示
+• 投屏卡顿：靠近路由器，或降低发送端分辨率</string>
 
     <!-- 投屏控制页 -->
     <string name="title_control">投屏控制</string>

@@ -112,9 +112,12 @@ class SenderActivity : BaseActivity() {
 
         nsdHelper.discover(this) { device ->
             runOnUiThread {
-                // 过滤本机（本机也可能在跑接收端待机页并广播自己）                if (device.ip == selfIp) return@runOnUiThread
-                if (devices.none { it.ip == device.ip }) {
-                    devices.add(device)
+                // 过滤本机：归一化 IP（mDNS 的 host 可能带 "/" 前缀）
+                val normIp = device.ip.trim().trimStart('/')
+                val normSelf = selfIp.trim().trimStart('/')
+                if (normSelf.isNotEmpty() && normIp == normSelf) return@runOnUiThread
+                if (devices.none { it.ip.trim().trimStart('/') == normIp }) {
+                    devices.add(device.copy(ip = normIp))
                     refreshList()
                 }
             }

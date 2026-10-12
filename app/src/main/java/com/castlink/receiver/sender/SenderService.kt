@@ -12,6 +12,7 @@ import android.hardware.display.DisplayManager
 import android.media.MediaCodec
 import android.media.MediaCodecInfo
 import android.media.MediaFormat
+import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
 import android.os.Build
 import android.os.Bundle
@@ -212,6 +213,15 @@ class SenderService : Service() {
         }
 
         // 4) VirtualDisplay 绑定编码 Surface
+        // Android 14+ 强制要求先 registerCallback，否则抛
+        // "Must register a callback before starting capture"
+        val projectionCallback = object : MediaProjection.Callback() {
+            override fun onStop() {
+                Log.i(TAG, "MediaProjection stopped by system")
+                runCatching { stopSelf() }
+            }
+        }
+        projection.registerCallback(projectionCallback, android.os.Handler(mainLooper))
         val virtualDisplay = try {
             projection.createVirtualDisplay(
                 "CastLinkSender",

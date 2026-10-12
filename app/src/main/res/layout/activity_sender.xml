@@ -63,7 +63,7 @@
         android:layout_width="match_parent"
         android:layout_height="56dp"
         android:layout_marginTop="12dp"
-        android:background="@drawable/bg_glass_card"
+        android:background="@drawable/bg_glass_btn"
         android:text="@string/sender_stop"
         android:textColor="@color/nebula_red"
         android:textSize="16sp" />
