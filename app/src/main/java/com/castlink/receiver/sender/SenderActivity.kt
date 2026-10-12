@@ -40,7 +40,7 @@ class SenderActivity : BaseActivity() {
 
     private val devices = mutableListOf<Device>()
     private val nsdHelper = NsdHelper()
-    private val selfIp: String by lazy { NetUtil.getLocalIp() }
+    private val selfIps: Set<String> by lazy { NetUtil.getAllLocalIps() }
 
     private var pendingIp: String? = null
     private var pendingPin: String? = null
@@ -112,10 +112,9 @@ class SenderActivity : BaseActivity() {
 
         nsdHelper.discover(this) { device ->
             runOnUiThread {
-                // 过滤本机：归一化 IP（mDNS 的 host 可能带 "/" 前缀）
+                // 过滤本机：与本机所有 IP 比对（mDNS 的 host 可能带 "/" 前缀）
                 val normIp = device.ip.trim().trimStart('/')
-                val normSelf = selfIp.trim().trimStart('/')
-                if (normSelf.isNotEmpty() && normIp == normSelf) return@runOnUiThread
+                if (normIp in selfIps) return@runOnUiThread
                 if (devices.none { it.ip.trim().trimStart('/') == normIp }) {
                     devices.add(device.copy(ip = normIp))
                     refreshList()

@@ -36,6 +36,33 @@ object NetUtil {
         return ""
     }
 
+    /**
+     * 返回本机所有非回环 IPv4 地址集合。
+     * 用于发送端发现页过滤本机：mDNS 上报的 IP 可能与 getLocalIp() 取到的
+     * 单个 IP 不一致（如 Fold3 上 Wi-Fi 接口不叫 wlan0，回退逻辑取到蜂窝 IP），
+     * 用集合比对更可靠。
+     */
+    fun getAllLocalIps(): Set<String> {
+        val result = mutableSetOf<String>()
+        try {
+            val ifaces = NetworkInterface.getNetworkInterfaces() ?: return result
+            while (ifaces.hasMoreElements()) {
+                val iface = ifaces.nextElement()
+                val addrs = iface.inetAddresses
+                while (addrs.hasMoreElements()) {
+                    val addr = addrs.nextElement()
+                    if (addr.isLoopbackAddress) continue
+                    val host = addr.hostAddress ?: continue
+                    if (host.contains(":")) continue // 跳过 IPv6
+                    result.add(host.trim().trimStart('/'))
+                }
+            }
+        } catch (e: Exception) {
+            // 忽略
+        }
+        return result
+    }
+
     private fun firstIpv4(iface: java.net.NetworkInterface): String {
         return try {
             val addrs = iface.inetAddresses
