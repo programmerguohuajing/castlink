@@ -22,10 +22,38 @@ object DeviceName {
     fun resolve(context: Context): String {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val saved = prefs.getString(KEY_DEVICE_NAME, null)?.trim()
-        if (!saved.isNullOrEmpty()) return saved
-        val def = context.getString(R.string.default_device_name).trim()
+        if (!saved.isNullOrEmpty()) {
+            // 迁移：之前所有设备都存了统一默认名 "CastLink-TV"，导致 iPhone
+            // AirPlay 列表里出现两个同名设备无法区分。非 TV 设备改成带机型的新默认名。
+            val oldDefault = context.getString(R.string.default_device_name).trim()
+            if (saved == oldDefault && !isTelevision(context)) {
+                val newDefault = defaultNameFor(context)
+                prefs.edit().putString(KEY_DEVICE_NAME, newDefault).apply()
+                return newDefault
+            }
+            return saved
+        }
+        val def = defaultNameFor(context)
         if (def.isNotEmpty()) return def
         return android.os.Build.MODEL
+    }
+
+    /** TV 用 CastLink-TV；手机/平板用 CastLink-机型，避免 AirPlay 列表重名。 */
+    private fun defaultNameFor(context: Context): String {
+        if (isTelevision(context)) {
+            val def = context.getString(R.string.default_device_name).trim()
+            if (def.isNotEmpty()) return def
+            return "CastLink-TV"
+        }
+        val model = android.os.Build.MODEL?.trim().orEmpty().take(24)
+        return if (model.isNotEmpty()) "CastLink-$model" else "CastLink-Phone"
+    }
+
+    private fun isTelevision(context: Context): Boolean {
+        val uiMode = context.getSystemService(Context.UI_MODE_SERVICE)
+            as? android.app.UiModeManager ?: return false
+        return uiMode.currentModeType ==
+            android.content.res.Configuration.UI_MODE_TYPE_TELEVISION
     }
 
     /**
