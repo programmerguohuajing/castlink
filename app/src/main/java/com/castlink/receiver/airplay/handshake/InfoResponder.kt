@@ -6,6 +6,7 @@ package com.castlink.receiver.airplay.handshake
 
 import android.content.Context
 import com.castlink.receiver.airplay.util.NetworkUtils
+import com.castlink.receiver.util.DeviceName
 
 /**
  * InfoResponder — builds the binary-plist body for `GET /info`, the first request a macOS
@@ -32,7 +33,7 @@ object InfoResponder {
             "features" to AIRPLAY_FEATURES,
             "statusFlags" to statusFlags,
             "model" to MODEL,
-            "name" to NetworkUtils.getDeviceName(context),
+            "name" to DeviceName.resolve(context),
             "sourceVersion" to SOURCE_VERSION,
             "pi" to NetworkUtils.getPersistentUuid(context),
             "pk" to PairingKeys.get(context).edPublic,

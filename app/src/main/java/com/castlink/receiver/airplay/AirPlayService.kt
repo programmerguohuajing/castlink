@@ -25,12 +25,13 @@ class AirPlayService : Service() {
         super.onCreate()
         startForegroundNotification()
 
-        val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
-        val deviceName = prefs.getString(KEY_DEVICE_NAME, null)?.takeIf { it.isNotBlank() }
+        // 与待机页/设置页保持一致：无用户自定义名时用默认名 CastLink-TV，
+        // 不再退到系统机型名（新装机上曾广播成 E900V22C，导致 iPhone 选错设备）
+        val deviceName = com.castlink.receiver.util.DeviceName.resolve(this)
 
         receiver = AirPlayReceiver(
             context = this,
-            displayName = deviceName ?: "",
+            displayName = deviceName,
             pinAuthEnabled = true,
             audioEnabled = true,
             videoSurfaceProvider = { AirPlayUiBridge.provideSurface() },
@@ -73,7 +74,5 @@ class AirPlayService : Service() {
     companion object {
         private const val CHANNEL_ID = "castlink_airplay"
         private const val NOTIFICATION_ID = 7001
-        private const val PREFS = "castlink_prefs"
-        private const val KEY_DEVICE_NAME = "device_name"
     }
 }

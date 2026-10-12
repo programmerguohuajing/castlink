@@ -275,9 +275,9 @@ class StandbyActivity : BaseActivity() {
         tvStatus = findViewById(R.id.tv_standby_status)
         tvPinHint = findViewById(R.id.tv_pin_hint)
 
-        val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
-        deviceName = prefs.getString(KEY_DEVICE_NAME, getString(R.string.default_device_name))
-            ?: getString(R.string.default_device_name)
+        // 首次启动把默认设备名写进 prefs，供 AirPlayService 等先启动的组件读取
+        com.castlink.receiver.util.DeviceName.ensurePersisted(this)
+        deviceName = com.castlink.receiver.util.DeviceName.resolve(this)
         localIp = NetUtil.getLocalIp()
 
         tvDeviceName.text = deviceName
