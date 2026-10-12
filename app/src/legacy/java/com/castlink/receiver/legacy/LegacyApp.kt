@@ -31,6 +31,14 @@ class LegacyApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // 崩溃日志写到外部存储，方便 4.4 设备上抓取（adb 不便时）
+        Thread.setDefaultUncaughtExceptionHandler { t, e ->
+            try {
+                val logFile = File(getExternalFilesDir(null), "legacy_crash.log")
+                logFile.writeText("thread=${t.name}\n${Log.getStackTraceString(e)}")
+            } catch (_: Exception) {}
+            android.os.Process.killProcess(android.os.Process.myPid())
+        }
         prefs = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         deviceName = prefs.getString(KEY_DEVICE_NAME, "CastLink-TV") ?: "CastLink-TV"
         Log.i(TAG, "LegacyApp starting (device=$deviceName)")

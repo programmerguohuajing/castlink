@@ -20,8 +20,8 @@ APP_CP="$AJAR:$STDLIB:$ZXING"
 
 PROJ=~/workspace/castlink
 OUT=$PROJ/build/legacy
-VERSION_NAME="0.1.0"
-VERSION_CODE=1
+VERSION_NAME="0.1.1"
+VERSION_CODE=2
 APK_NAME="CastLink-legacy-v${VERSION_NAME}.apk"
 
 rm -rf "$OUT"

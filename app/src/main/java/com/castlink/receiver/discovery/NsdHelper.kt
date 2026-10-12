@@ -35,8 +35,11 @@ class NsdHelper {
             serviceName = deviceName
             serviceType = SERVICE_TYPE_CASTLINK
             port = 8755
-            setAttribute("tier", "mainstream")
-            setAttribute("pin", pin)
+            // v0.1.0-legacy: setAttribute 是 API 21+，4.4 上调用直接 NoSuchMethodError 崩溃
+            if (android.os.Build.VERSION.SDK_INT >= 21) {
+                setAttribute("tier", "mainstream")
+                setAttribute("pin", pin)
+            }
         }
         registerService(manager, castlink)
     }
