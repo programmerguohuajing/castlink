@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">CastLink</string>
+    <string name="legacy_waiting">等待投屏…</string>
+    <string name="legacy_streaming">正在投屏</string>
+
+    <style name="Theme.CastLink.Legacy" parent="android:Theme.Holo.NoActionBar">
+        <item name="android:windowBackground">@android:color/black</item>
+    </style>
+</resources>

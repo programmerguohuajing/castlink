@@ -6,11 +6,13 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.view.Gravity
 import android.view.MotionEvent
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 import android.view.View
 import android.view.WindowManager
+import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.TextView
 import com.castlink.receiver.R
@@ -361,6 +363,12 @@ class StandbyActivity : BaseActivity() {
             // v0.3.10：AirPlay 镜像连上 → 视频层全屏；断开 → 藏回待机页
             airplaySurfaceView.visibility =
                 if (state == ProtocolState.CONNECTED) View.VISIBLE else View.INVISIBLE
+            if (state == ProtocolState.CONNECTED) {
+                // v0.1.2 (issue #2)：竖屏时保持视频宽高比，不拉伸
+                fitAirPlaySurfaceToVideo()
+            } else {
+                handler.removeCallbacks(fitSurfaceRunnable)
+            }
             tvStatus.text = when (state) {
                 ProtocolState.CONNECTED -> getString(
                     R.string.airplay_connected,
@@ -370,6 +378,53 @@ class StandbyActivity : BaseActivity() {
                 else -> getString(R.string.standby_waiting)
             }
         }
+    }
+
+    /**
+     * v0.1.2 (issue #2)：AirPlay 视频宽高比适配。
+     *
+     * SurfaceView 默认 match_parent 会把视频拉伸填满全屏——安卓竖屏收横屏视频时
+     * 画面会被纵向拉长。改为按视频真实宽高比 fit-center：等比缩放居中，黑边留白。
+     * 解码器输出尺寸可能晚于 CONNECTED 到达，所以轮询到拿到有效尺寸为止。
+     */
+    private val fitSurfaceRunnable = object : Runnable {
+        override fun run() {
+            if (!fitAirPlaySurfaceToVideo()) {
+                // 还没拿到视频尺寸，500ms 后重试
+                handler.postDelayed(this, 500)
+            }
+        }
+    }
+
+    /** 返回 true 表示已应用适配（拿到有效尺寸），false 表示需继续等待。 */
+    private fun fitAirPlaySurfaceToVideo(): Boolean {
+        val vw = com.castlink.receiver.airplay.StreamStats.videoWidth
+        val vh = com.castlink.receiver.airplay.StreamStats.videoHeight
+        if (vw <= 0 || vh <= 0) {
+            handler.postDelayed(fitSurfaceRunnable, 500)
+            return false
+        }
+        val parent = airplaySurfaceView.parent as? android.view.View ?: return true
+        val pw = parent.width
+        val ph = parent.height
+        if (pw <= 0 || ph <= 0) {
+            handler.postDelayed(fitSurfaceRunnable, 500)
+            return false
+        }
+        val videoAspect = vw.toFloat() / vh
+        val parentAspect = pw.toFloat() / ph
+        val (newW, newH) = if (videoAspect > parentAspect) {
+            pw to (pw / videoAspect).toInt()          // 视频更宽：按宽度适配
+        } else {
+            ((ph * videoAspect).toInt() to ph)        // 视频更高：按高度适配
+        }
+        val lp = airplaySurfaceView.layoutParams as FrameLayout.LayoutParams
+        lp.width = newW
+        lp.height = newH
+        lp.gravity = Gravity.CENTER
+        airplaySurfaceView.layoutParams = lp
+        Log.i(TAG, "AirPlay surface fitted to ${vw}x$vh -> ${newW}x$newH")
+        return true
     }
 
     override fun onDestroy() {

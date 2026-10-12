@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">CastLink</string>
+    <string name="legacy_waiting">Waiting for cast…</string>
+    <string name="legacy_streaming">Casting</string>
+</resources>

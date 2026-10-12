@@ -1,11 +1,13 @@
 package com.castlink.receiver.sender
 
+import android.Manifest
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager
 import android.media.projection.MediaProjectionManager
 import android.os.Build
 import android.os.Bundle
@@ -105,10 +107,12 @@ class SenderActivity : BaseActivity() {
             lvDevices.post { askPinAndStart(device) }
         }
 
+        // v0.1.2 (issue #2)：Android 12+ 申请"附近设备"权限，用于局域网发现
+        requestNearbyPermission()
+
         nsdHelper.discover(this) { device ->
             runOnUiThread {
-                // 过滤本机（本机也可能在跑接收端待机页并广播自己）
-                if (device.ip == selfIp) return@runOnUiThread
+                // 过滤本机（本机也可能在跑接收端待机页并广播自己）                if (device.ip == selfIp) return@runOnUiThread
                 if (devices.none { it.ip == device.ip }) {
                     devices.add(device)
                     refreshList()
@@ -137,6 +141,20 @@ class SenderActivity : BaseActivity() {
     override fun onDestroy() {
         nsdHelper.stopDiscovery()
         super.onDestroy()
+    }
+
+    /** v0.1.2 (issue #2)：Android 12+ "附近设备"权限（NEARBY_WIFI_DEVICES，neverForLocation） */
+    private fun requestNearbyPermission() {
+        if (Build.VERSION.SDK_INT >= 31) {
+            if (checkSelfPermission(Manifest.permission.NEARBY_WIFI_DEVICES)
+                != PackageManager.PERMISSION_GRANTED
+            ) {
+                requestPermissions(
+                    arrayOf(Manifest.permission.NEARBY_WIFI_DEVICES),
+                    REQUEST_NEARBY
+                )
+            }
+        }
     }
 
     private fun refreshList() {
@@ -193,6 +211,7 @@ class SenderActivity : BaseActivity() {
 
     companion object {
         private const val REQ_CAPTURE = 2001
+        private const val REQUEST_NEARBY = 2002
         private const val STATE_PENDING_IP = "pending_ip"
         private const val STATE_PENDING_PIN = "pending_pin"
         /** v0.3.11：手动输入的接收端 IP，直连跳过 mDNS 发现 */
