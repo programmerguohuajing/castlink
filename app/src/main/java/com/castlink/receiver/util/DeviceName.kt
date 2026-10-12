@@ -51,9 +51,14 @@ object DeviceName {
 
     private fun isTelevision(context: Context): Boolean {
         val uiMode = context.getSystemService(Context.UI_MODE_SERVICE)
-            as? android.app.UiModeManager ?: return false
-        return uiMode.currentModeType ==
-            android.content.res.Configuration.UI_MODE_TYPE_TELEVISION
+            as? android.app.UiModeManager
+        if (uiMode?.currentModeType ==
+            android.content.res.Configuration.UI_MODE_TYPE_TELEVISION) return true
+        val pm = context.packageManager
+        // TV 盒子常不上报 TV 模式；有 leanback 即为 TV
+        if (pm.hasSystemFeature(android.content.pm.PackageManager.FEATURE_LEANBACK)) return true
+        // 无电话功能→非手机，按 TV/盒子处理（Skyworth E900V22C 等盒子走这里）
+        return !pm.hasSystemFeature(android.content.pm.PackageManager.FEATURE_TELEPHONY)
     }
 
     /**

@@ -450,6 +450,8 @@ class StandbyActivity : BaseActivity() {
     private fun generatePin(): String = (1000..9999).random().toString()
 
     private fun updatePinViews() {
+        // 防御：PIN 不应为空，为空时重新生成（避免 TV 上出现空白 PIN 框）
+        if (pin.length != 4) pin = generatePin()
         updatePinViews(pin)
     }
 
