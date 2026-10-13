@@ -143,6 +143,7 @@
 
         <Button
             android:id="@+id/btn_save_device_name"
+            android:nextFocusDown="@+id/btn_skip_pair_verify"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
@@ -162,6 +163,8 @@
 
         <Button
             android:id="@+id/btn_skip_pair_verify"
+            android:nextFocusUp="@+id/btn_save_device_name"
+            android:nextFocusDown="@+id/btn_clear_pairings"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
                         android:textColor="@color/nebula_text"
@@ -178,6 +181,7 @@
 
         <Button
             android:id="@+id/btn_clear_pairings"
+            android:nextFocusUp="@+id/btn_skip_pair_verify"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"

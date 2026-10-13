@@ -59,7 +59,7 @@ class StandbyActivity : BaseActivity() {
     private lateinit var tvStatus: TextView
     private lateinit var tvPinHint: TextView
     private lateinit var tvFilePush: TextView
-    private lateinit var pinViews: List<TextView>
+    private lateinit var tvPinSingle: TextView
 
     /** AirPlay 配对 PIN（非空时四格显示它，并暂停自有 PIN 轮换）。 */
     private var airPlayPin: String? = null
@@ -268,12 +268,8 @@ class StandbyActivity : BaseActivity() {
         tvCapability = findViewById(R.id.tv_standby_capability)
         tvLocalIp = findViewById(R.id.tv_standby_ip)
         tvFilePush = findViewById(R.id.tv_file_push)
-        pinViews = listOf(
-            findViewById(R.id.tv_pin_1),
-            findViewById(R.id.tv_pin_2),
-            findViewById(R.id.tv_pin_3),
-            findViewById(R.id.tv_pin_4)
-        )
+        // v0.1.13: PIN 改用单个 TextView（四格在部分电视上渲染失败）
+        tvPinSingle = findViewById(R.id.tv_pin_single)
         tvStatus = findViewById(R.id.tv_standby_status)
         tvPinHint = findViewById(R.id.tv_pin_hint)
 
@@ -456,9 +452,8 @@ class StandbyActivity : BaseActivity() {
     }
 
     private fun updatePinViews(code: String) {
-        pinViews.forEachIndexed { index, tv ->
-            tv.text = code.getOrNull(index)?.toString() ?: getString(R.string.unknown_value)
-        }
+        // v0.1.13: 单个 TextView 显示完整 PIN，避免四格渲染失败
+        tvPinSingle.text = if (code.length == 4) code else getString(R.string.unknown_value)
     }
 
     private fun updateQr() {
