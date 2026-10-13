@@ -1,1 +1,1 @@
-{"_comment":"CastLink OTA","apkUrl":"https://github.com/programmerguohuajing/castlink/releases/download/v0.1.15/CastLink-v0.1.15.apk","changelog":"v0.1.15\n- TV PIN 改用 Canvas 绘制\n- 播放器全屏+15秒看门狗","versionCode":36,"versionName":"0.1.15"}
+{"_comment":"CastLink OTA","apkUrl":"https://github.com/programmerguohuajing/castlink/releases/download/v0.1.18/CastLink-v0.1.18.apk","changelog":"v0.1.18\n- PIN 内置字体\n- 发送端 WakeLock\n- 首页设备名过滤","versionCode":39,"versionName":"0.1.18"}
