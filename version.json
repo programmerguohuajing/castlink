@@ -1,1 +1,1 @@
-{"_comment":"CastLink OTA","apkUrl":"https://github.com/programmerguohuajing/castlink/releases/download/v0.1.18/CastLink-v0.1.18.apk","changelog":"v0.1.18\n- PIN 内置字体\n- 发送端 WakeLock\n- 首页设备名过滤","versionCode":39,"versionName":"0.1.18"}
+{"_comment":"CastLink OTA","apkUrl":"https://github.com/programmerguohuajing/castlink/releases/download/v0.1.20/CastLink-v0.1.20.apk","changelog":"v0.1.20\n- PIN 7段数码管\n- AirPlayService 自启动\n- 首页设备名过滤","versionCode":41,"versionName":"0.1.20"}
