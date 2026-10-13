@@ -139,8 +139,8 @@
                 android:textColor="@color/nebula_text_3ry"
                 android:textSize="12sp" />
 
-            <com.castlink.receiver.ui.SevenSegmentPinView
-                    android:id="@+id/pin_seven_segment"
+            <com.castlink.receiver.ui.PinCanvasView
+                    android:id="@+id/pin_canvas"
                     android:layout_width="480dp"
                     android:layout_height="150dp"
                     android:layout_marginTop="8dp" />
