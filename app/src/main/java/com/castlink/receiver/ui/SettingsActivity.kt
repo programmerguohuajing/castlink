@@ -101,6 +101,60 @@ class SettingsActivity : BaseActivity() {
 
         // v0.1.1 (issue #1)：AirPlay 配对
         setupAirPlaySection()
+
+        // v0.1.26: 手动 D-pad 焦点控制（TV 上系统焦点搜索不可靠，经常跳过按钮）
+        setupManualDpad()
+    }
+
+    /**
+     * v0.1.26: 手动 D-pad 焦点链。按布局从上到下顺序，UP/DOWN 移动焦点，
+     * CENTER/ENTER 触发点击。彻底绕开系统的焦点搜索算法。
+     */
+    private var dpadFocusIndex = 0
+    private lateinit var dpadFocusList: List<android.view.View>
+
+    private fun setupManualDpad() {
+        dpadFocusList = listOfNotNull(
+            findViewById<android.view.View>(R.id.row_language),
+            findViewById<android.view.View>(R.id.btn_prefer_5g),
+            findViewById<android.view.View>(R.id.btn_legacy_mode),
+            findViewById<android.view.View>(R.id.et_device_name),
+            findViewById<android.view.View>(R.id.btn_save_device_name),
+            findViewById<android.view.View>(R.id.btn_skip_pair_verify),
+            findViewById<android.view.View>(R.id.btn_clear_pairings),
+            findViewById<android.view.View>(R.id.btn_auto_update),
+            findViewById<android.view.View>(R.id.btn_check_update),
+            findViewById<android.view.View>(R.id.btn_save_update_cfg)
+        ).filter { it.visibility == android.view.View.VISIBLE }
+        // 初始焦点给第一个
+        dpadFocusList.firstOrNull()?.let {
+            it.requestFocus()
+            dpadFocusIndex = 0
+        }
+    }
+
+    override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent?): Boolean {
+        if (!::dpadFocusList.isInitialized || dpadFocusList.isEmpty()) {
+            return super.onKeyDown(keyCode, event)
+        }
+        when (keyCode) {
+            android.view.KeyEvent.KEYCODE_DPAD_DOWN -> {
+                dpadFocusIndex = (dpadFocusIndex + 1) % dpadFocusList.size
+                dpadFocusList[dpadFocusIndex].requestFocus()
+                return true
+            }
+            android.view.KeyEvent.KEYCODE_DPAD_UP -> {
+                dpadFocusIndex = (dpadFocusIndex - 1 + dpadFocusList.size) % dpadFocusList.size
+                dpadFocusList[dpadFocusIndex].requestFocus()
+                return true
+            }
+            android.view.KeyEvent.KEYCODE_DPAD_CENTER,
+            android.view.KeyEvent.KEYCODE_ENTER -> {
+                dpadFocusList.getOrNull(dpadFocusIndex)?.performClick()
+                return true
+            }
+        }
+        return super.onKeyDown(keyCode, event)
     }
 
     /** v0.1.1 (issue #1)：可信局域网跳过配对校验 + 清除已配对设备 */
