@@ -59,7 +59,7 @@ class StandbyActivity : BaseActivity() {
     private lateinit var tvStatus: TextView
     private lateinit var tvPinHint: TextView
     private lateinit var tvFilePush: TextView
-    private lateinit var tvPinSingle: TextView
+    private lateinit var pinCanvasView: PinCanvasView
 
     /** AirPlay 配对 PIN（非空时四格显示它，并暂停自有 PIN 轮换）。 */
     private var airPlayPin: String? = null
@@ -268,8 +268,8 @@ class StandbyActivity : BaseActivity() {
         tvCapability = findViewById(R.id.tv_standby_capability)
         tvLocalIp = findViewById(R.id.tv_standby_ip)
         tvFilePush = findViewById(R.id.tv_file_push)
-        // v0.1.13: PIN 改用单个 TextView（四格在部分电视上渲染失败）
-        tvPinSingle = findViewById(R.id.tv_pin_single)
+        // v0.1.14: PIN 改用 Canvas 直接绘制（TextView 大字在 Hisense 上渲染失败）
+        pinCanvasView = findViewById(R.id.pin_canvas)
         tvStatus = findViewById(R.id.tv_standby_status)
         tvPinHint = findViewById(R.id.tv_pin_hint)
 
@@ -452,8 +452,8 @@ class StandbyActivity : BaseActivity() {
     }
 
     private fun updatePinViews(code: String) {
-        // v0.1.13: 单个 TextView 显示完整 PIN，避免四格渲染失败
-        tvPinSingle.text = if (code.length == 4) code else getString(R.string.unknown_value)
+        // v0.1.14: Canvas 直接绘制，绕开 TextView
+        pinCanvasView.pin = if (code.length == 4) code else "----"
     }
 
     private fun updateQr() {
