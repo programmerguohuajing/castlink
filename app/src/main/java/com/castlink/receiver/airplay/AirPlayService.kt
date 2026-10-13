@@ -32,7 +32,8 @@ class AirPlayService : Service() {
         receiver = AirPlayReceiver(
             context = this,
             displayName = deviceName,
-            pinAuthEnabled = true,
+            // v0.1.23: 临时关闭 PIN（SRP 握手有 bug 导致 iOS PIN 死循环，修好前先让 iOS 能连上）
+            pinAuthEnabled = false,
             audioEnabled = true,
             videoSurfaceProvider = { AirPlayUiBridge.provideSurface() },
             onStateChanged = { state -> AirPlayUiBridge.emitState(state) },

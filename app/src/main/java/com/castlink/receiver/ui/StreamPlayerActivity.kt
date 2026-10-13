@@ -1,10 +1,12 @@
 package com.castlink.receiver.ui
 
+import android.graphics.Matrix
+import android.graphics.SurfaceTexture
 import android.os.Bundle
 import android.os.SystemClock
 import android.util.Log
-import android.view.SurfaceHolder
-import android.view.SurfaceView
+import android.view.Surface
+import android.view.TextureView
 import android.view.View
 import android.view.WindowManager
 import android.widget.Button
@@ -19,14 +21,15 @@ import kotlin.concurrent.thread
 
 /**
  * v0.3.10：原生协议投屏播放页（全屏）。
+ * v0.1.22: SurfaceView -> TextureView，支持 centerCrop 铺满（修竖屏视频黑边）。
  *
  * StandbyActivity 收到首个 RTP NAL 时自动拉起本页；NAL 经 [NativeStreamBridge]
- * 进入队列，喂给 [VideoPipeline] 解码渲染。5 秒收不到 NAL 看门狗自动退出；
+ * 进入队列，喂给 [VideoPipeline] 解码渲染。15 秒收不到 NAL 看门狗自动退出；
  * 右下角"断开"按钮手动退出。
  */
 class StreamPlayerActivity : BaseActivity() {
 
-    private lateinit var surfaceView: SurfaceView
+    private lateinit var textureView: TextureView
     private lateinit var tvStatus: TextView
 
     private val nalQueue = LinkedBlockingQueue<ByteArray>()
@@ -51,16 +54,26 @@ class StreamPlayerActivity : BaseActivity() {
         )
         setContentView(R.layout.activity_stream_player)
 
-        surfaceView = findViewById(R.id.sv_stream)
+        textureView = findViewById(R.id.tv_stream)
         tvStatus = findViewById(R.id.tv_stream_status)
         findViewById<Button>(R.id.btn_stream_close).setOnClickListener { finish() }
 
         tvStatus.text = getString(R.string.stream_connecting)
-        surfaceView.holder.addCallback(object : SurfaceHolder.Callback {
-            override fun surfaceCreated(holder: SurfaceHolder) = startPipeline(holder)
-            override fun surfaceChanged(holder: SurfaceHolder, format: Int, w: Int, h: Int) {}
-            override fun surfaceDestroyed(holder: SurfaceHolder) = stopPipeline()
-        })
+        // v0.1.22: TextureView 监听 SurfaceTexture，用 centerCrop 铺满
+        textureView.surfaceTextureListener = object : TextureView.SurfaceTextureListener {
+            override fun onSurfaceTextureAvailable(st: SurfaceTexture, w: Int, h: Int) {
+                startPipeline(Surface(st))
+                updateCropTransform()
+            }
+            override fun onSurfaceTextureSizeChanged(st: SurfaceTexture, w: Int, h: Int) {
+                updateCropTransform()
+            }
+            override fun onSurfaceTextureDestroyed(st: SurfaceTexture): Boolean {
+                stopPipeline()
+                return true
+            }
+            override fun onSurfaceTextureUpdated(st: SurfaceTexture) {}
+        }
 
         NativeStreamBridge.nalListener = { nal ->
             lastNalTime = SystemClock.elapsedRealtime()
@@ -73,8 +86,7 @@ class StreamPlayerActivity : BaseActivity() {
         NativeStreamBridge.endListener = { runOnUiThread { finish() } }
     }
 
-    private fun startPipeline(holder: SurfaceHolder) {
-        val surface = holder.surface ?: return
+    private fun startPipeline(surface: Surface) {
         if (!surface.isValid) return
         val pipe = VideoPipeline(surface)
         // 发送端为 720p H.264；SPS/PPS 走带内（in-band），解码器从码流中获取
@@ -118,6 +130,32 @@ class StreamPlayerActivity : BaseActivity() {
             }
         }
         Log.i(TAG, "pipeline started")
+    }
+
+    /**
+     * v0.1.22: centerCrop 变换，让视频铺满 TextureView（裁掉多余部分）。
+     * 视频 1280x720，View 可能是竖屏或横屏，取最大缩放比铺满。
+     */
+    private fun updateCropTransform() {
+        val viewW = textureView.width.toFloat()
+        val viewH = textureView.height.toFloat()
+        if (viewW <= 0 || viewH <= 0) return
+        // 视频尺寸（发送端固定 1280x720）
+        val videoW = 1280f
+        val videoH = 720f
+
+        val scaleX = viewW / videoW
+        val scaleY = viewH / videoH
+        // centerCrop: 取大者，铺满并裁剪
+        val scale = maxOf(scaleX, scaleY)
+
+        val matrix = Matrix()
+        // 先缩放到铺满，再平移到中心
+        val dx = (viewW - videoW * scale) / 2f
+        val dy = (viewH - videoH * scale) / 2f
+        matrix.setScale(scale, scale)
+        matrix.postTranslate(dx, dy)
+        textureView.setTransform(matrix)
     }
 
     private fun stopPipeline() {
