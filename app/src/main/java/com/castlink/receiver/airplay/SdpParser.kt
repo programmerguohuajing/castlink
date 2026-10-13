@@ -122,7 +122,9 @@ object SdpParser {
             }
         }
 
-        val hasVideo = videoPort >= 0 && spsBytes != null
+        // v0.1.12: hasVideo 不依赖 SPS——iPhone 的 SDP 可能不带 sprop-parameter-sets，
+        // SPS/PPS 会在 RTP 流的 IDR 帧里带内传输。解码器支持从流中提取。
+        val hasVideo = videoPort >= 0
         val hasAudio = audioPort >= 0 && audioCodec != AudioCodec.UNKNOWN
 
         if (!hasVideo && !hasAudio) {

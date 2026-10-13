@@ -110,8 +110,7 @@
             android:id="@+id/btn_prefer_5g"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="@drawable/bg_glass_btn"
-            android:textColor="@color/nebula_text"
+                        android:textColor="@color/nebula_text"
             android:gravity="start|center_vertical"
             android:padding="12dp" />
 
@@ -119,8 +118,7 @@
             android:id="@+id/btn_legacy_mode"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="@drawable/bg_glass_btn"
-            android:textColor="@color/nebula_text"
+                        android:textColor="@color/nebula_text"
             android:gravity="start|center_vertical"
             android:padding="12dp" />
 
@@ -166,8 +164,7 @@
             android:id="@+id/btn_skip_pair_verify"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="@drawable/bg_glass_btn"
-            android:textColor="@color/nebula_text"
+                        android:textColor="@color/nebula_text"
             android:gravity="start|center_vertical"
             android:padding="12dp" />
 
@@ -251,8 +248,7 @@
             android:id="@+id/btn_auto_update"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="@drawable/bg_glass_btn"
-            android:textColor="@color/nebula_text"
+                        android:textColor="@color/nebula_text"
             android:gravity="start|center_vertical"
             android:padding="12dp" />
     </LinearLayout>

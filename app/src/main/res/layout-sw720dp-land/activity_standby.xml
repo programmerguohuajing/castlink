@@ -185,8 +185,9 @@
                     android:background="@drawable/bg_pin_box"
                     android:gravity="center"
                     android:textColor="@color/nebula_cyan"
-                    android:textSize="96sp"
-                    android:textStyle="bold" />
+                    android:textSize="56sp"
+                    android:textStyle="bold" 
+                    android:includeFontPadding="false" />
 
                 <TextView
                     android:id="@+id/tv_pin_2"
@@ -196,8 +197,9 @@
                     android:background="@drawable/bg_pin_box"
                     android:gravity="center"
                     android:textColor="@color/nebula_cyan"
-                    android:textSize="96sp"
-                    android:textStyle="bold" />
+                    android:textSize="56sp"
+                    android:textStyle="bold" 
+                    android:includeFontPadding="false" />
 
                 <TextView
                     android:id="@+id/tv_pin_3"
@@ -207,8 +209,9 @@
                     android:background="@drawable/bg_pin_box"
                     android:gravity="center"
                     android:textColor="@color/nebula_cyan"
-                    android:textSize="96sp"
-                    android:textStyle="bold" />
+                    android:textSize="56sp"
+                    android:textStyle="bold" 
+                    android:includeFontPadding="false" />
 
                 <TextView
                     android:id="@+id/tv_pin_4"
@@ -218,8 +221,9 @@
                     android:background="@drawable/bg_pin_box"
                     android:gravity="center"
                     android:textColor="@color/nebula_cyan"
-                    android:textSize="96sp"
-                    android:textStyle="bold" />
+                    android:textSize="56sp"
+                    android:textStyle="bold" 
+                    android:includeFontPadding="false" />
             </LinearLayout>
         </LinearLayout>
     </LinearLayout>

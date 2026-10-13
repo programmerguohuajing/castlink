@@ -39,7 +39,10 @@ class VideoDecoder(private val outputSurface: Surface) {
 
     // Track whether the decoder has been initialized (to prevent double-init)
     @Volatile
-    private var isInitialized = false
+    private var _isInitialized = false
+
+    /** Public read-only access for lazy initialization from in-band SPS/PPS. */
+    val isInitialized: Boolean get() = _isInitialized
 
     /**
      * False once MediaCodec has thrown (entered an unrecoverable error state). The caller should
@@ -122,7 +125,7 @@ class VideoDecoder(private val outputSurface: Surface) {
         mediaCodec!!.configure(format, outputSurface, null, 0)
         mediaCodec!!.start()
 
-        isInitialized = true
+        _isInitialized = true
         Logger.i("H.264 decoder initialized successfully")
     }
 
@@ -258,7 +261,7 @@ class VideoDecoder(private val outputSurface: Surface) {
             Logger.e("Error releasing MediaCodec (non-fatal)", e)
         } finally {
             mediaCodec = null
-            isInitialized = false
+            _isInitialized = false
         }
     }
 

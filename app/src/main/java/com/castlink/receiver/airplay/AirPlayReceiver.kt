@@ -365,22 +365,48 @@ class AirPlayReceiver(
             Logger.w("VideoDecoder: no surface available — skipping video pipeline")
             return
         }
-        val sps = session.spsBytes ?: run {
-            Logger.w("VideoDecoder: no SPS in SDP — skipping")
-            return
-        }
-        val pps = session.ppsBytes ?: run {
-            Logger.w("VideoDecoder: no PPS in SDP — skipping")
-            return
-        }
+        val spsFromSdp = session.spsBytes
+        val ppsFromSdp = session.ppsBytes
 
         videoDecoder = VideoDecoder(s).also { decoder ->
-            decoder.initialize(sps, pps, DEFAULT_VIDEO_WIDTH, DEFAULT_VIDEO_HEIGHT)
+            // v0.1.12: SDP 可能不带 SPS/PPS（如 iPhone），此时等带内参数集。
+            // 先设置 NAL 监听，收到 SPS/PPS 后再初始化解码器。
+            var pendingSps = spsFromSdp
+            var pendingPps = ppsFromSdp
+            fun tryInit() {
+                val sps = pendingSps
+                val pps = pendingPps
+                if (sps != null && pps != null && !decoder.isInitialized) {
+                    try {
+                        decoder.initialize(sps, pps, DEFAULT_VIDEO_WIDTH, DEFAULT_VIDEO_HEIGHT)
+                        Logger.i("VideoDecoder initialized from " + if (spsFromSdp != null) "SDP" else "in-band")
+                    } catch (e: Exception) {
+                        Logger.e("VideoDecoder init failed", e)
+                    }
+                }
+            }
+            // SDP 自带则直接初始化
+            tryInit()
             rtspHandler?.onVideoNalUnit = { nalUnit, ptsUs ->
-                decoder.decodeNalUnit(nalUnit, ptsUs)
+                // 从带内 NAL 提取 SPS/PPS（H.264 NAL type 7=SPS, 8=PPS）
+                if (nalUnit.isNotEmpty()) {
+                    val nalType = nalUnit[0].toInt() and 0x1F
+                    if (nalType == 7 && pendingSps == null) {
+                        pendingSps = nalUnit.copyOf()
+                        Logger.i("VideoDecoder: got in-band SPS")
+                    } else if (nalType == 8 && pendingPps == null) {
+                        pendingPps = nalUnit.copyOf()
+                        Logger.i("VideoDecoder: got in-band PPS")
+                    }
+                    tryInit()
+                }
+                if (decoder.isInitialized) {
+                    decoder.decodeNalUnit(nalUnit, ptsUs)
+                }
+                // 未初始化时丢弃视频帧（等 SPS/PPS），避免解码器报错
             }
         }
-        Logger.i("VideoDecoder started (${DEFAULT_VIDEO_WIDTH}x${DEFAULT_VIDEO_HEIGHT} hint)")
+        Logger.i("VideoDecoder pipeline set up (${DEFAULT_VIDEO_WIDTH}x${DEFAULT_VIDEO_HEIGHT} hint)")
     }
 
     /**

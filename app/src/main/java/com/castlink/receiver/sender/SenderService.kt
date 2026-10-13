@@ -447,8 +447,8 @@ class SenderService : Service() {
 
         private const val WIDTH = 1280
         private const val HEIGHT = 720
-        private const val BITRATE = 2_000_000
-        private const val FRAME_RATE = 30
+        private const val BITRATE = 1_500_000
+        private const val FRAME_RATE = 25
         private const val I_FRAME_INTERVAL_SEC = 2
     }
 }
