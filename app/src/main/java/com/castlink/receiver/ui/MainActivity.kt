@@ -45,6 +45,11 @@ class MainActivity : BaseActivity() {
 
     private val devices = mutableListOf<Device>()
     private val nsdHelper = NsdHelper()
+    // v0.1.24: 首页也过滤本机（之前只在 SenderActivity 加了）
+    private val selfIps: Set<String> by lazy { com.castlink.receiver.util.NetUtil.getAllLocalIps() }
+    private val selfName: String by lazy {
+        com.castlink.receiver.util.DeviceName.resolve(this)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -155,6 +160,10 @@ class MainActivity : BaseActivity() {
 
         nsdHelper.discover(this) { device ->
             runOnUiThread {
+                // v0.1.24: 过滤本机（IP + 设备名双重过滤）
+                val normIp = device.ip.trim().trimStart('/')
+                if (normIp in selfIps) return@runOnUiThread
+                if (device.name.trim() == selfName.trim()) return@runOnUiThread
                 val index = devices.indexOfFirst { it.ip == device.ip }
                 if (index >= 0) {
                     devices[index] = device.copy(isFavorite = devices[index].isFavorite)
