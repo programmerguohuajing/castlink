@@ -23,10 +23,20 @@ object DeviceName {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val saved = prefs.getString(KEY_DEVICE_NAME, null)?.trim()
         if (!saved.isNullOrEmpty()) {
-            // 迁移：之前所有设备都存了统一默认名 "CastLink-TV"，导致 iPhone
-            // AirPlay 列表里出现两个同名设备无法区分。非 TV 设备改成带机型的新默认名。
             val oldDefault = context.getString(R.string.default_device_name).trim()
-            if (saved == oldDefault && !isTelevision(context)) {
+            val isTv = isTelevision(context)
+            // TV 纠偏：v0.1.4 曾把电视盒子误判为手机，迁移成了 "CastLink-机型"；
+            // v0.1.6 修复识别后，已存错的名字要迁回 CastLink-TV。
+            if (isTv) {
+                val modelName = "CastLink-${android.os.Build.MODEL?.trim().orEmpty().take(24)}"
+                if (saved == modelName && saved != oldDefault) {
+                    prefs.edit().putString(KEY_DEVICE_NAME, oldDefault).apply()
+                    return oldDefault
+                }
+                return saved
+            }
+            // 非 TV：之前存了统一默认名，迁移到带机型的新默认名（v0.1.4）
+            if (saved == oldDefault) {
                 val newDefault = defaultNameFor(context)
                 prefs.edit().putString(KEY_DEVICE_NAME, newDefault).apply()
                 return newDefault
