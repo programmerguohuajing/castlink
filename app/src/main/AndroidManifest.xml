@@ -3,6 +3,8 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <!-- v0.1.16: 发送端投屏期间保持 CPU 唤醒 -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- v0.3.5：加回。NetUtil.isWifiConnected 用 ConnectivityManager 判 Wi-Fi 连通性 -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />

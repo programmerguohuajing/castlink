@@ -40,10 +40,19 @@ class SenderService : Service() {
 
     private val running = AtomicBoolean(false)
     private var worker: Thread? = null
+    private var wakeLock: android.os.PowerManager.WakeLock? = null
 
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
+        // v0.1.16: 投屏期间保持 CPU 唤醒，避免灭屏/Doze 导致断流（1-2 分钟断的根因）
+        val pm = getSystemService(android.content.Context.POWER_SERVICE) as android.os.PowerManager
+        wakeLock = pm.newWakeLock(
+            android.os.PowerManager.PARTIAL_WAKE_LOCK,
+            "CastLink:SenderWakeLock"
+        ).apply {
+            acquire(30 * 60 * 1000L)  // 最长 30 分钟，投屏结束释放
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -120,6 +129,11 @@ class SenderService : Service() {
             Thread.currentThread().interrupt()
         }
         worker = null
+        // v0.1.16: 释放 WakeLock
+        runCatching {
+            if (wakeLock?.isHeld == true) wakeLock?.release()
+        }
+        wakeLock = null
         super.onDestroy()
     }
 

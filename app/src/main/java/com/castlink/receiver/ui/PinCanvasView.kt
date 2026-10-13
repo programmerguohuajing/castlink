@@ -5,6 +5,7 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.util.AttributeSet
 import android.view.View
+import com.castlink.receiver.R
 
 /**
  * v0.1.14: PIN 显示改用 Canvas 直接绘制，不走 TextView。
@@ -27,6 +28,15 @@ class PinCanvasView @JvmOverloads constructor(
         color = 0xFF00E5FF.toInt()  // nebula_cyan
         textAlign = Paint.Align.CENTER
         isFakeBoldText = true
+    }
+
+    init {
+        // v0.1.17: 使用 APK 内置字体，不依赖盒子系统字体（E900V22C 系统字体渲染失败）
+        // minSdk 26，Resources.getFont() 可用，无需 AndroidX
+        runCatching {
+            val tf = context.resources.getFont(R.font.pin_font)
+            paint.typeface = tf
+        }
     }
 
     private val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {

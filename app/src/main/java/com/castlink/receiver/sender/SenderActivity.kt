@@ -41,6 +41,10 @@ class SenderActivity : BaseActivity() {
     private val devices = mutableListOf<Device>()
     private val nsdHelper = NsdHelper()
     private val selfIps: Set<String> by lazy { NetUtil.getAllLocalIps() }
+    // v0.1.16: 本机设备名也用于过滤（IP 比对可能因 Wi-Fi 时机失效）
+    private val selfName: String by lazy {
+        com.castlink.receiver.util.DeviceName.resolve(this)
+    }
 
     private var pendingIp: String? = null
     private var pendingPin: String? = null
@@ -115,6 +119,8 @@ class SenderActivity : BaseActivity() {
                 // 过滤本机：与本机所有 IP 比对（mDNS 的 host 可能带 "/" 前缀）
                 val normIp = device.ip.trim().trimStart('/')
                 if (normIp in selfIps) return@runOnUiThread
+                // v0.1.16: 再按设备名过滤（IP 比对失效时的兜底，如 Wi-Fi 后连上）
+                if (device.name.trim() == selfName.trim()) return@runOnUiThread
                 if (devices.none { it.ip.trim().trimStart('/') == normIp }) {
                     devices.add(device.copy(ip = normIp))
                     refreshList()
