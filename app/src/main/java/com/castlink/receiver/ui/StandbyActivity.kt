@@ -59,7 +59,7 @@ class StandbyActivity : BaseActivity() {
     private lateinit var tvStatus: TextView
     private lateinit var tvPinHint: TextView
     private lateinit var tvFilePush: TextView
-    private lateinit var pinCanvasView: PinCanvasView
+    private lateinit var tvPinSingle: TextView
 
     /** AirPlay 配对 PIN（非空时四格显示它，并暂停自有 PIN 轮换）。 */
     private var airPlayPin: String? = null
@@ -268,8 +268,8 @@ class StandbyActivity : BaseActivity() {
         tvCapability = findViewById(R.id.tv_standby_capability)
         tvLocalIp = findViewById(R.id.tv_standby_ip)
         tvFilePush = findViewById(R.id.tv_file_push)
-        // v0.1.21: 回滚到 PinCanvasView（7 段数码管在三星上显示异常）
-        pinCanvasView = findViewById(R.id.pin_canvas)
+        // v0.1.25: 回滚到普通 TextView（用户指出时间显示正常，TextView 没问题，是自定义 View 的布局问题）
+        tvPinSingle = findViewById(R.id.tv_pin_single)
         tvStatus = findViewById(R.id.tv_standby_status)
         tvPinHint = findViewById(R.id.tv_pin_hint)
 
@@ -462,8 +462,8 @@ class StandbyActivity : BaseActivity() {
     }
 
     private fun updatePinViews(code: String) {
-        // v0.1.21: 回滚到 Canvas+内置字体（三星上正常）
-        pinCanvasView.pin = if (code.length == 4) code else "----"
+        // v0.1.25: 普通 TextView，48sp（时间显示正常，证明 TextView 可用）
+        tvPinSingle.text = if (code.length == 4) code else "----"
     }
 
     private fun updateQr() {

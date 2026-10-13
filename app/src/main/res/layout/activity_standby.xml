@@ -139,11 +139,22 @@
                 android:textColor="@color/nebula_text_3ry"
                 android:textSize="12sp" />
 
-            <com.castlink.receiver.ui.PinCanvasView
-                    android:id="@+id/pin_canvas"
-                    android:layout_width="480dp"
-                    android:layout_height="150dp"
-                    android:layout_marginTop="8dp" />
+            <TextView
+                    android:id="@+id/tv_pin_single"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:background="@drawable/bg_pin_box"
+                    android:gravity="center"
+                    android:paddingStart="32dp"
+                    android:paddingEnd="32dp"
+                    android:paddingTop="12dp"
+                    android:paddingBottom="12dp"
+                    android:textColor="@color/nebula_cyan"
+                    android:textSize="48sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.25"
+                    android:includeFontPadding="false" />
         </LinearLayout>
     </LinearLayout>
 
