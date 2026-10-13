@@ -59,7 +59,7 @@ class StandbyActivity : BaseActivity() {
     private lateinit var tvStatus: TextView
     private lateinit var tvPinHint: TextView
     private lateinit var tvFilePush: TextView
-    private lateinit var pinCanvasView: PinCanvasView
+    private lateinit var pinSevenSegment: SevenSegmentPinView
 
     /** AirPlay 配对 PIN（非空时四格显示它，并暂停自有 PIN 轮换）。 */
     private var airPlayPin: String? = null
@@ -268,8 +268,8 @@ class StandbyActivity : BaseActivity() {
         tvCapability = findViewById(R.id.tv_standby_capability)
         tvLocalIp = findViewById(R.id.tv_standby_ip)
         tvFilePush = findViewById(R.id.tv_file_push)
-        // v0.1.14: PIN 改用 Canvas 直接绘制（TextView 大字在 Hisense 上渲染失败）
-        pinCanvasView = findViewById(R.id.pin_canvas)
+        // v0.1.19: PIN 改用 7 段数码管绘制（E900V22C 的 Canvas.drawText 完全失效）
+        pinSevenSegment = findViewById(R.id.pin_seven_segment)
         tvStatus = findViewById(R.id.tv_standby_status)
         tvPinHint = findViewById(R.id.tv_pin_hint)
 
@@ -277,6 +277,16 @@ class StandbyActivity : BaseActivity() {
         com.castlink.receiver.util.DeviceName.ensurePersisted(this)
         deviceName = com.castlink.receiver.util.DeviceName.resolve(this)
         localIp = NetUtil.getLocalIp()
+
+        // v0.1.20: 待机页也确保 AirPlayService 运行（修 iOS "无法连接"：服务没起来时 7000 端口不监听）
+        runCatching {
+            val svcIntent = android.content.Intent(this, com.castlink.receiver.airplay.AirPlayService::class.java)
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                startForegroundService(svcIntent)
+            } else {
+                startService(svcIntent)
+            }
+        }
 
         tvDeviceName.text = deviceName
         tvCapability.text = getString(R.string.standby_capability)
@@ -452,8 +462,8 @@ class StandbyActivity : BaseActivity() {
     }
 
     private fun updatePinViews(code: String) {
-        // v0.1.14: Canvas 直接绘制，绕开 TextView
-        pinCanvasView.pin = if (code.length == 4) code else "----"
+        // v0.1.19: 7 段数码管绘制，不用字体
+        pinSevenSegment.pin = if (code.length == 4) code else "----"
     }
 
     private fun updateQr() {
