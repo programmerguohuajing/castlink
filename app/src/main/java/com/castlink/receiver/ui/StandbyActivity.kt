@@ -258,8 +258,9 @@ class StandbyActivity : BaseActivity() {
         setContentView(R.layout.activity_standby)
 
         // 全屏 + 常亮（v0.3.0：30 秒无操作降亮至 0.05 防烧屏，而非常亮到底）
+        // v0.1.39: 用 FLAG_FULLSCREEN 真全屏，修 E900V22C 顶部黑条
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_FULLSCREEN
+        window.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN)
 
         tvWifiName = findViewById(R.id.tv_standby_wifi)
         tvClock = findViewById(R.id.tv_standby_clock)
