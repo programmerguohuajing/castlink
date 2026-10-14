@@ -10,6 +10,9 @@ import android.view.Surface
  */
 class VideoPipeline(private val surface: Surface) {
 
+    /** 解码器输出尺寸变化时回调（width, height），用于 UI 计算 centerCrop。 */
+    var onOutputSizeChanged: ((Int, Int) -> Unit)? = null
+
     private var codec: MediaCodec? = null
 
     /** 已渲染到 surface 的输出帧计数（只增）。 */
@@ -84,6 +87,12 @@ class VideoPipeline(private val surface: Surface) {
                 }
                 index == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
                     Log.i(TAG, "decoder output format changed: ${c.outputFormat}")
+                    try {
+                        val fmt = c.outputFormat
+                        val w = fmt.getInteger(MediaFormat.KEY_WIDTH)
+                        val h = fmt.getInteger(MediaFormat.KEY_HEIGHT)
+                        if (w > 0 && h > 0) onOutputSizeChanged?.invoke(w, h)
+                    } catch (e: Exception) { }
                     false
                 }
                 else -> false // INFO_TRY_AGAIN_LATER 等

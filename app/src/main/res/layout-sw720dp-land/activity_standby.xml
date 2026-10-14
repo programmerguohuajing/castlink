@@ -131,20 +131,50 @@
                 android:textSize="24sp" />
         </LinearLayout>
 
-        <!-- 右区：玻璃卡 -->
+        <!-- 右区：玻璃卡，横向：左侧 PIN、右侧二维码 -->
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:background="@drawable/bg_glass_card"
-            android:gravity="center_horizontal"
-            android:orientation="vertical"
-            android:padding="28dp">
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="24dp">
 
+            <!-- 左侧：PIN -->
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center_horizontal"
+                android:orientation="vertical"
+                android:paddingEnd="24dp">
+
+                <TextView
+                    android:id="@+id/tv_pin_hint"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:letterSpacing="0.1"
+                    android:text="@string/standby_pin_hint"
+                    android:textColor="@color/nebula_text_3ry"
+                    android:textSize="20sp" />
+
+                <TextView
+                    android:id="@+id/tv_pin_single"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:gravity="center"
+                    android:textColor="#00E5FF"
+                    android:textSize="72sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.1" />
+            </LinearLayout>
+
+            <!-- 右侧：二维码（减小白边） -->
             <FrameLayout
-                android:layout_width="320dp"
-                android:layout_height="320dp"
+                android:layout_width="280dp"
+                android:layout_height="280dp"
                 android:background="@color/white"
-                android:padding="12dp">
+                android:padding="6dp">
 
                 <ImageView
                     android:id="@+id/iv_standby_qr"
@@ -161,36 +191,6 @@
                     android:textSize="18sp"
                     android:visibility="gone" />
             </FrameLayout>
-
-            <TextView
-                android:id="@+id/tv_pin_hint"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:letterSpacing="0.2"
-                android:text="@string/standby_pin_hint"
-                android:textColor="@color/nebula_text_3ry"
-                android:textSize="18sp" />
-
-            <LinearLayout
-                    android:layout_width="420dp"
-                    android:layout_height="110dp"
-                    android:layout_marginTop="8dp"
-                    android:background="#0A1226"
-                    android:gravity="center"
-                    android:orientation="horizontal">
-
-                    <TextView
-                        android:id="@+id/tv_pin_single"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:gravity="center"
-                        android:textColor="#00E5FF"
-                        android:textSize="52sp"
-                        android:textStyle="bold"
-                        android:letterSpacing="0.3"
-                        android:includeFontPadding="false" />
-                </LinearLayout>
         </LinearLayout>
     </LinearLayout>
 
@@ -239,5 +239,13 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:visibility="invisible" />
+
+    <!-- v0.1.28：AirPlay 照片层（PUT /photo），收到照片时显示，清空时隐藏 -->
+    <ImageView
+        android:id="@+id/iv_airplay_photo"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="fitCenter"
+        android:visibility="gone" />
 
 </FrameLayout>

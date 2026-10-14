@@ -38,6 +38,8 @@ class StreamPlayerActivity : BaseActivity() {
     private var feedThread: Thread? = null
     private var drainThread: Thread? = null
     @Volatile private var lastNalTime = 0L
+    @Volatile private var videoW = 1280f
+    @Volatile private var videoH = 720f
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -140,9 +142,9 @@ class StreamPlayerActivity : BaseActivity() {
         val viewW = textureView.width.toFloat()
         val viewH = textureView.height.toFloat()
         if (viewW <= 0 || viewH <= 0) return
-        // 视频尺寸（发送端固定 1280x720）
-        val videoW = 1280f
-        val videoH = 720f
+        // 视频尺寸：用解码器输出的真实尺寸（Fold3 等设备不是 1280x720）
+        val videoW = this.videoW
+        val videoH = this.videoH
 
         val scaleX = viewW / videoW
         val scaleY = viewH / videoH
@@ -182,6 +184,6 @@ class StreamPlayerActivity : BaseActivity() {
 
     companion object {
         private const val TAG = "StreamPlayer"
-        private const val WATCHDOG_MS = 15_000L
+        private const val WATCHDOG_MS = 30_000L
     }
 }

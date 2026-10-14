@@ -38,7 +38,9 @@ class AirPlayService : Service() {
             videoSurfaceProvider = { AirPlayUiBridge.provideSurface() },
             onStateChanged = { state -> AirPlayUiBridge.emitState(state) },
             onSenderNameChanged = { name -> AirPlayUiBridge.emitSenderName(name) },
-            onPinChanged = { pin -> AirPlayUiBridge.emitPin(pin) }
+            onPinChanged = { pin -> AirPlayUiBridge.emitPin(pin) },
+            onPhotoReceived = { bytes, _ -> AirPlayUiBridge.emitPhoto(bytes) },
+            onPhotoCleared = { AirPlayUiBridge.emitPhoto(ByteArray(0)) }
         ).also { it.start() }
         Logger.i("AirPlayService created (pinAuth=true)")
     }

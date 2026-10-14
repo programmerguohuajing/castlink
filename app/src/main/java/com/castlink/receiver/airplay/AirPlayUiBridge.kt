@@ -23,6 +23,9 @@ object AirPlayUiBridge {
     /** 发送端名称（RECORD 到达时先于 CONNECTED 触发）。 */
     @Volatile var senderNameListener: ((String) -> Unit)? = null
 
+    /** AirPlay 照片（PUT /photo 的 JPEG/PNG），主线程派发，UI 收到后显示。 */
+    @Volatile var photoListener: ((ByteArray) -> Unit)? = null
+
     /** 视频 Surface 提供者，由 ControlActivity 在 surface 就绪时注册、销毁时置空。 */
     @Volatile var surfaceProvider: (() -> Surface?)? = null
 
@@ -34,6 +37,11 @@ object AirPlayUiBridge {
     internal fun emitState(state: ProtocolState) {
         val l = stateListener ?: return
         mainHandler.post { l(state) }
+    }
+
+    internal fun emitPhoto(bytes: ByteArray) {
+        val l = photoListener ?: return
+        mainHandler.post { l(bytes) }
     }
 
     internal fun emitSenderName(name: String) {

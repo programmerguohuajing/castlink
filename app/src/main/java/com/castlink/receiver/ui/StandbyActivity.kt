@@ -176,6 +176,7 @@ class StandbyActivity : BaseActivity() {
     /** 任一接收链路激活（RTP NAL 到达 / AirPlay CONNECTED）：恢复常亮并停止降亮计时。 */
     // v0.3.10：AirPlay 镜像视频层
     private lateinit var airplaySurfaceView: SurfaceView
+    private lateinit var airplayPhotoView: android.widget.ImageView
     @Volatile private var airplaySurfaceReady = false
 
     // v0.3.10：原生协议投屏——首个 NAL 拉起全屏播放页，后续 NAL 经桥接转发解码。
@@ -330,10 +331,12 @@ class StandbyActivity : BaseActivity() {
         AirPlayUiBridge.pinListener = { p -> onAirPlayPin(p) }
         AirPlayUiBridge.stateListener = { state -> onAirPlayState(state) }
         AirPlayUiBridge.senderNameListener = { name -> airPlaySenderName = name }
+        AirPlayUiBridge.photoListener = { bytes -> onAirPlayPhoto(bytes) }
 
         // v0.3.10：待机页直接提供 AirPlay 镜像 surface——sv_airplay_video 平时
         // invisible（surface 保留），有视频流时切 visible 全屏显示。
         airplaySurfaceView = findViewById(R.id.sv_airplay_video)
+        airplayPhotoView = findViewById(R.id.iv_airplay_photo)
         airplaySurfaceView.holder.addCallback(object : SurfaceHolder.Callback {
             override fun surfaceCreated(holder: SurfaceHolder) { airplaySurfaceReady = true }
             override fun surfaceChanged(holder: SurfaceHolder, f: Int, w: Int, h: Int) {}
@@ -341,6 +344,24 @@ class StandbyActivity : BaseActivity() {
         })
         AirPlayUiBridge.surfaceProvider = {
             if (airplaySurfaceReady) airplaySurfaceView.holder.surface else null
+        }
+    }
+
+    /** AirPlay 照片（PUT /photo）：空数组=清空隐藏，非空=解码显示。 */
+    private fun onAirPlayPhoto(bytes: ByteArray) {
+        runOnUiThread {
+            if (bytes.isEmpty()) {
+                airplayPhotoView.visibility = android.view.View.GONE
+                airplayPhotoView.setImageDrawable(null)
+            } else {
+                val bmp = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                if (bmp != null) {
+                    airplayPhotoView.setImageBitmap(bmp)
+                    airplayPhotoView.visibility = android.view.View.VISIBLE
+                    // 照片显示时隐藏视频层，避免重叠
+                    airplaySurfaceView.visibility = android.view.View.INVISIBLE
+                }
+            }
         }
     }
 
@@ -438,6 +459,7 @@ class StandbyActivity : BaseActivity() {
         AirPlayUiBridge.stateListener = null
         AirPlayUiBridge.senderNameListener = null
         AirPlayUiBridge.surfaceProvider = null
+        AirPlayUiBridge.photoListener = null
         nativePlayerLaunched = false
         handler.removeCallbacks(clockRunnable)
         handler.removeCallbacks(pinRunnable)

@@ -188,8 +188,7 @@
                         android:textColor="#00E5FF"
                         android:textSize="52sp"
                         android:textStyle="bold"
-                        android:letterSpacing="0.3"
-                        android:includeFontPadding="false" />
+                        android:letterSpacing="0.1" />
                 </LinearLayout>
         </LinearLayout>
     </LinearLayout>
@@ -239,5 +238,13 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:visibility="invisible" />
+
+    <!-- v0.1.28：AirPlay 照片层（PUT /photo），收到照片时显示，清空时隐藏 -->
+    <ImageView
+        android:id="@+id/iv_airplay_photo"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="fitCenter"
+        android:visibility="gone" />
 
 </FrameLayout>
