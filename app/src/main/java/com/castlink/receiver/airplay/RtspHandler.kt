@@ -240,35 +240,50 @@ open class RtspHandler(
         currentRemoteAddress = socket.inetAddress
 
         try {
+            // v0.1.32: 外层循环——RTP 流结束后回到 RTSP 请求循环，而不是关 Socket。
+            // 之前 RTP 结束直接关连接，iPhone 切新照片/视频时没法在同一连接上发新请求，画面卡在首帧。
             while (running && !socket.isClosed) {
-                val request = requestReader.read(inputStream) ?: break
-                currentCSeq = request.headers["CSeq"]?.toIntOrNull() ?: 0
-                val response = routeRequest(request)
-                sendResponse(outputStream, response)
+                var switchedToRtp = false
+                while (running && !socket.isClosed) {
+                    val request = requestReader.read(inputStream) ?: break
+                    currentCSeq = request.headers["CSeq"]?.toIntOrNull() ?: 0
+                    val response = routeRequest(request)
+                    sendResponse(outputStream, response)
 
-                // After RECORD on a legacy SDP session: a session WITH video switches to interleaved
-                // RTP (video arrives $-framed over this TCP socket). An audio-only session (e.g. Apple
-                // Music) keeps the RTSP control loop — audio arrives on the UDP port, and macOS sends
-                // now-playing metadata / volume / FLUSH / TEARDOWN as RTSP requests here that we must
-                // keep handling (switching to interleaved mode would skip them → no metadata).
-                if (request.method == "RECORD" && response.statusCode == 200 && !isMirrorSession &&
-                    currentSession?.hasVideo == true) {
-                    Logger.d("RTSP handshake complete — switching to interleaved RTP (video)")
+                    // After RECORD on a legacy SDP session: a session WITH video switches to interleaved
+                    // RTP (video arrives $-framed over this TCP socket). An audio-only session (e.g. Apple
+                    // Music) keeps the RTSP control loop — audio arrives on the UDP port, and macOS sends
+                    // now-playing metadata / volume / FLUSH / TEARDOWN as RTSP requests here that we must
+                    // keep handling (switching to interleaved mode would skip them → no metadata).
+                    if (request.method == "RECORD" && response.statusCode == 200 && !isMirrorSession &&
+                        currentSession?.hasVideo == true) {
+                        Logger.d("RTSP handshake complete — switching to interleaved RTP (video)")
+                        switchedToRtp = true
+                        break
+                    }
+                    // TEARDOWN 关闭当前会话，回到外层循环等下一个会话
+                    if (request.method == "TEARDOWN") {
+                        currentSession = null
+                    }
+                }
+
+                val session = currentSession
+                if (switchedToRtp && session != null && session.hasVideo && running) {
+                    RtpInterleaved.readLoop(
+                        inputStream = inputStream,
+                        onVideoNalUnit = { nalUnit, ptsUs ->
+                            onVideoNalUnit?.invoke(nalUnit, ptsUs)
+                        },
+                        onStreamEnded = {
+                            Logger.i("RTP stream ended, returning to RTSP loop")
+                        }
+                    )
+                    // RTP 结束，清除会话，回到外层循环继续收 RTSP 请求
+                    currentSession = null
+                } else if (!switchedToRtp) {
+                    // 没切 RTP 且 RTSP 循环退出（Socket 关闭或 EOF），退出外层循环
                     break
                 }
-            }
-
-            val session = currentSession
-            if (session != null && session.hasVideo && running) {
-                RtpInterleaved.readLoop(
-                    inputStream = inputStream,
-                    onVideoNalUnit = { nalUnit, ptsUs ->
-                        onVideoNalUnit?.invoke(nalUnit, ptsUs)
-                    },
-                    onStreamEnded = {
-                        Logger.i("RTP stream ended")
-                    }
-                )
             }
         } catch (e: java.net.SocketTimeoutException) {
             // 30 秒无数据，客户端已断开（或僵死），正常清理，不记为错误
