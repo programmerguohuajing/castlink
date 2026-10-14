@@ -210,6 +210,12 @@ class SettingsActivity : BaseActivity() {
         findViewById<Button>(R.id.btn_check_update).setOnClickListener {
             checkUpdate(manual = true)
         }
+        // v0.1.34: 查看日志（应用内，不导出文件）
+        runCatching {
+            findViewById<Button>(R.id.btn_view_logs).setOnClickListener {
+                startActivity(android.content.Intent(this, LogViewerActivity::class.java))
+            }
+        }
     }
 
     /** 检查更新；manual=true 时无更新也 toast 提示 */

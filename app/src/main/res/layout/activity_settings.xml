@@ -239,6 +239,13 @@
                 android:text="@string/btn_check_update" />
 
             <Button
+                android:id="@+id/btn_view_logs"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="查看日志" />
+
+            <Button
                 android:id="@+id/btn_save_update_cfg"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
