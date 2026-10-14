@@ -4,6 +4,7 @@ import android.media.MediaCodec
 import android.media.MediaFormat
 import android.util.Log
 import android.view.Surface
+import com.castlink.receiver.airplay.util.Logger as AirPlayLogger
 
 /**
  * 解码管线：把收到的 NAL/采样数据喂给 MediaCodec 解码并渲染到 [surface]。
@@ -91,7 +92,7 @@ class VideoPipeline(private val surface: Surface) {
                         val fmt = c.outputFormat
                         val w = fmt.getInteger(MediaFormat.KEY_WIDTH)
                         val h = fmt.getInteger(MediaFormat.KEY_HEIGHT)
-                        if (w > 0 && h > 0) onOutputSizeChanged?.invoke(w, h)
+                        if (w > 0 && h > 0) { AirPlayLogger.i("VideoPipeline output size ${w}x${h}"); onOutputSizeChanged?.invoke(w, h) }
                     } catch (e: Exception) { }
                     false
                 }

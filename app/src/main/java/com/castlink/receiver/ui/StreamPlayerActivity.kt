@@ -13,6 +13,7 @@ import android.widget.Button
 import android.widget.TextView
 import com.castlink.receiver.R
 import com.castlink.receiver.player.VideoPipeline
+import com.castlink.receiver.airplay.util.Logger as AirPlayLogger
 import com.castlink.receiver.protocol.NativeStreamBridge
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
@@ -164,6 +165,7 @@ class StreamPlayerActivity : BaseActivity() {
         matrix.setScale(scale, scale)
         matrix.postTranslate(dx, dy)
         textureView.setTransform(matrix)
+        AirPlayLogger.i("CropTransform: view=${viewW}x${viewH} video=${videoW}x${videoH} scale=$scale dx=$dx dy=$dy")
     }
 
     private fun stopPipeline() {
