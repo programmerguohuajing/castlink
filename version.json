@@ -1,1 +1,1 @@
-{"_comment":"CastLink OTA","apkUrl":"https://github.com/programmerguohuajing/castlink/releases/download/v0.1.37/CastLink-v0.1.37.apk","changelog":"v0.1.37\n- HEVC 支持（iPhone 相册视频）\n- 发送端原生宽高比（修三星→电视黑边）","versionCode":58,"versionName":"0.1.37"}
+{"_comment":"CastLink OTA","apkUrl":"https://github.com/programmerguohuajing/castlink/releases/download/v0.1.38/CastLink-v0.1.38.apk","changelog":"v0.1.38\n- RTCP RR（修 iPhone RECORD 后 1 秒断开）","versionCode":59,"versionName":"0.1.38"}
