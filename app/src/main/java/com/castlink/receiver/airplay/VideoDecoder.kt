@@ -32,7 +32,7 @@ import com.castlink.receiver.airplay.util.Logger
  *   decoder.decodeNalUnit(nalUnitBytes)                    // call for each video chunk
  *   decoder.release()                                       // call when done
  */
-class VideoDecoder(private val outputSurface: Surface) {
+class VideoDecoder(private val outputSurface: Surface, private val codec: com.castlink.receiver.airplay.VideoCodec = com.castlink.receiver.airplay.VideoCodec.H264) {
 
     // The underlying hardware decoder — null until initialize() is called
     private var mediaCodec: MediaCodec? = null
@@ -73,7 +73,7 @@ class VideoDecoder(private val outputSurface: Surface) {
      * @param width     Video width in pixels (from SDP)
      * @param height    Video height in pixels (from SDP)
      */
-    fun initialize(spsBytes: ByteArray, ppsBytes: ByteArray, width: Int, height: Int) {
+    fun initialize(spsBytes: ByteArray, ppsBytes: ByteArray, width: Int, height: Int, vpsBytes: ByteArray? = null) {
         if (isInitialized) {
             Logger.w("VideoDecoder.initialize() called twice — ignoring second call")
             return
@@ -97,16 +97,21 @@ class VideoDecoder(private val outputSurface: Surface) {
         StreamStats.videoWidth = actualWidth
         StreamStats.videoHeight = actualHeight
 
-        // Create the MediaFormat that describes the H.264 stream to the hardware decoder
+        // Create the MediaFormat that describes the stream to the hardware decoder
         val format = MediaFormat.createVideoFormat(
-            MediaFormat.MIMETYPE_VIDEO_AVC,  // AVC = Advanced Video Coding = H.264
+            if (codec == com.castlink.receiver.airplay.VideoCodec.HEVC) MediaFormat.MIMETYPE_VIDEO_HEVC else MediaFormat.MIMETYPE_VIDEO_AVC,
             actualWidth,
             actualHeight
         ).apply {
-            // Provide SPS and PPS so MediaCodec can configure the hardware decoder.
-            // These are wrapped in ByteBuffers as required by the MediaCodec API.
-            setByteBuffer("csd-0", java.nio.ByteBuffer.wrap(spsBytes))  // SPS
-            setByteBuffer("csd-1", java.nio.ByteBuffer.wrap(ppsBytes))  // PPS
+            if (codec == com.castlink.receiver.airplay.VideoCodec.HEVC && vpsBytes != null) {
+                // HEVC: csd-0 = VPS+SPS+PPS 合并（Annex-B 起始码格式）
+                val startCode = byteArrayOf(0, 0, 0, 1)
+                val combined = vpsBytes + startCode + spsBytes + startCode + ppsBytes
+                setByteBuffer("csd-0", java.nio.ByteBuffer.wrap(combined))
+            } else {
+                setByteBuffer("csd-0", java.nio.ByteBuffer.wrap(spsBytes))  // SPS
+                setByteBuffer("csd-1", java.nio.ByteBuffer.wrap(ppsBytes))  // PPS
+            }
             // NOTE: do NOT set KEY_MAX_WIDTH/HEIGHT here — this SoC's MStar decoder rejects
             // adaptive playback (BadParameter / buffer-count failures) and produces banding.
             // Resolution changes are handled by recreating the decoder in MirrorStreamServer.
@@ -115,7 +120,7 @@ class VideoDecoder(private val outputSurface: Surface) {
         // Create the hardware H.264 decoder.
         // "video/avc" is the MIME type for H.264. Android will pick the best
         // available hardware decoder for this format.
-        mediaCodec = MediaCodec.createDecoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
+        mediaCodec = MediaCodec.createDecoderByType(if (codec == com.castlink.receiver.airplay.VideoCodec.HEVC) MediaFormat.MIMETYPE_VIDEO_HEVC else MediaFormat.MIMETYPE_VIDEO_AVC)
 
         // Configure the decoder:
         // - format: what the input will look like (H.264, width, height, SPS/PPS)

@@ -368,7 +368,7 @@ class AirPlayReceiver(
         val spsFromSdp = session.spsBytes
         val ppsFromSdp = session.ppsBytes
 
-        videoDecoder = VideoDecoder(s).also { decoder ->
+        videoDecoder = VideoDecoder(s, session.videoCodec).also { decoder ->
             // v0.1.12: SDP 可能不带 SPS/PPS（如 iPhone），此时等带内参数集。
             // 先设置 NAL 监听，收到 SPS/PPS 后再初始化解码器。
             var pendingSps = spsFromSdp
@@ -378,7 +378,7 @@ class AirPlayReceiver(
                 val pps = pendingPps
                 if (sps != null && pps != null && !decoder.isInitialized) {
                     try {
-                        decoder.initialize(sps, pps, DEFAULT_VIDEO_WIDTH, DEFAULT_VIDEO_HEIGHT)
+                        decoder.initialize(sps, pps, DEFAULT_VIDEO_WIDTH, DEFAULT_VIDEO_HEIGHT, session.vpsBytes)
                         Logger.i("VideoDecoder initialized from " + if (spsFromSdp != null) "SDP" else "in-band")
                     } catch (e: Exception) {
                         Logger.e("VideoDecoder init failed", e)
@@ -390,13 +390,25 @@ class AirPlayReceiver(
             rtspHandler?.onVideoNalUnit = { nalUnit, ptsUs ->
                 // 从带内 NAL 提取 SPS/PPS（H.264 NAL type 7=SPS, 8=PPS）
                 if (nalUnit.isNotEmpty()) {
-                    val nalType = nalUnit[0].toInt() and 0x1F
-                    if (nalType == 7 && pendingSps == null) {
-                        pendingSps = nalUnit.copyOf()
-                        Logger.i("VideoDecoder: got in-band SPS")
-                    } else if (nalType == 8 && pendingPps == null) {
-                        pendingPps = nalUnit.copyOf()
-                        Logger.i("VideoDecoder: got in-band PPS")
+                    if (session.videoCodec == VideoCodec.HEVC) {
+                        // HEVC NAL type 在 byte0 的 bit1-6
+                        val nalType = (nalUnit[0].toInt() shr 1) and 0x3F
+                        if (nalType == 33 && pendingSps == null) {
+                            pendingSps = nalUnit.copyOf()
+                            Logger.i("VideoDecoder: got in-band HEVC SPS")
+                        } else if (nalType == 34 && pendingPps == null) {
+                            pendingPps = nalUnit.copyOf()
+                            Logger.i("VideoDecoder: got in-band HEVC PPS")
+                        }
+                    } else {
+                        val nalType = nalUnit[0].toInt() and 0x1F
+                        if (nalType == 7 && pendingSps == null) {
+                            pendingSps = nalUnit.copyOf()
+                            Logger.i("VideoDecoder: got in-band SPS")
+                        } else if (nalType == 8 && pendingPps == null) {
+                            pendingPps = nalUnit.copyOf()
+                            Logger.i("VideoDecoder: got in-band PPS")
+                        }
                     }
                     tryInit()
                 }

@@ -193,12 +193,29 @@ class SenderService : Service() {
             return
         }
 
+        // v0.1.37: 用屏幕原生宽高比建 VirtualDisplay，避免竖屏被缩进横屏 1280x720 留黑边。
+        // 接收端 centerCrop 会裁掉多余部分填满电视。
+        val dm = resources.displayMetrics
+        val screenW = dm.widthPixels
+        val screenH = dm.heightPixels
+        // 长边 cap 到 1280 控制码率，短边按比例算，取偶数
+        val (encW, encH) = if (screenW >= screenH) {
+            val w = 1280
+            val h = (1280f * screenH / screenW).toInt() and -2
+            w to h.coerceAtLeast(2)
+        } else {
+            val h = 1280
+            val w = (1280f * screenW / screenH).toInt() and -2
+            w.coerceAtLeast(2) to h
+        }
+        android.util.Log.i(TAG, "Capture size: screen=${screenW}x${screenH} enc=${encW}x${encH}")
+
         // 3) H.264 编码器（Surface 输入）
         val encoder: MediaCodec
         val inputSurface: android.view.Surface
         try {
             val format = MediaFormat.createVideoFormat(
-                MediaFormat.MIMETYPE_VIDEO_AVC, WIDTH, HEIGHT
+                MediaFormat.MIMETYPE_VIDEO_AVC, encW, encH
             ).apply {
                 setInteger(
                     MediaFormat.KEY_COLOR_FORMAT,
@@ -239,7 +256,7 @@ class SenderService : Service() {
         val virtualDisplay = try {
             projection.createVirtualDisplay(
                 "CastLinkSender",
-                WIDTH, HEIGHT,
+                encW, encH,
                 resources.displayMetrics.densityDpi,
                 DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
                 inputSurface, null, null

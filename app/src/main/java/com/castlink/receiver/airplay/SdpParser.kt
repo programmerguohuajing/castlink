@@ -66,6 +66,9 @@ object SdpParser {
         var sampleRate = DEFAULT_SAMPLE_RATE
         var channels = DEFAULT_CHANNELS
 
+        // 视频编码（H.264 或 HEVC）
+        var videoCodec = VideoCodec.H264
+        var vpsBytes: ByteArray? = null
         // H.264 codec parameters
         var spsBytes: ByteArray? = null
         var ppsBytes: ByteArray? = null
@@ -97,10 +100,14 @@ object SdpParser {
                 line.startsWith("a=") -> {
                     val attr = line.removePrefix("a=")
                     when (currentSection) {
-                        "video" -> parseVideoAttribute(attr)?.let { (sps, pps, profile) ->
-                            spsBytes = sps
-                            ppsBytes = pps
-                            h264ProfileLevelId = profile
+                        "video" -> {
+                            if (attr.startsWith("rtpmap:") && attr.contains("H265", ignoreCase = true)) videoCodec = VideoCodec.HEVC
+                            parseVideoAttribute(attr, videoCodec)?.let { (vps, sps, pps, profile) ->
+                                vpsBytes = vps
+                                spsBytes = sps
+                                ppsBytes = pps
+                                h264ProfileLevelId = profile
+                            }
                         }
                         "audio" -> {
                             parseAudioCodecFromRtpmap(attr)?.let { (codec, rate, ch) ->
@@ -135,6 +142,8 @@ object SdpParser {
         Logger.i("SdpParser: hasVideo=$hasVideo hasAudio=$hasAudio codec=$audioCodec")
 
         return SessionDescription(
+            videoCodec = videoCodec,
+            vpsBytes = vpsBytes,
             hasVideo = hasVideo,
             hasAudio = hasAudio,
             videoPort = videoPort,
@@ -174,7 +183,7 @@ object SdpParser {
      *
      * @return Triple(spsBytes, ppsBytes, profileLevelId) or null if not an fmtp line.
      */
-    private fun parseVideoAttribute(attr: String): Triple<ByteArray, ByteArray, String>? {
+    private fun parseVideoAttribute(attr: String, codec: VideoCodec = VideoCodec.H264): Quadruple<ByteArray?, ByteArray, ByteArray, String>? {
         if (!attr.startsWith("fmtp:")) return null
 
         val params = attr.substringAfter(" ")
@@ -183,6 +192,14 @@ object SdpParser {
             kv[0].trim() to (kv.getOrNull(1)?.trim() ?: "")
         }
 
+        if (codec == VideoCodec.HEVC) {
+            // HEVC: sprop-vps, sprop-sps, sprop-pps
+            val vps = paramMap["sprop-vps"]?.let { decodeBase64Safely(it) }
+            val sps = paramMap["sprop-sps"]?.let { decodeBase64Safely(it) } ?: return null
+            val pps = paramMap["sprop-pps"]?.let { decodeBase64Safely(it) } ?: return null
+            val profile = paramMap["profile-level-id"] ?: ""
+            return Quadruple(vps, sps, pps, profile)
+        }
         val profileLevelId = paramMap["profile-level-id"] ?: return null
         val spropSets = paramMap["sprop-parameter-sets"] ?: return null
         val setParts = spropSets.split(",")
@@ -190,7 +207,7 @@ object SdpParser {
         val sps = decodeBase64Safely(setParts.getOrNull(0)) ?: return null
         val pps = decodeBase64Safely(setParts.getOrNull(1)) ?: return null
 
-        return Triple(sps, pps, profileLevelId)
+        return Quadruple(null, sps, pps, profileLevelId)
     }
 
     /**
@@ -313,11 +330,15 @@ object SdpParser {
  * @param aesIv             16-byte AES-128 IV for audio decryption (null if not encrypted)
  * @param alacFramesPerPacket ALAC frames-per-packet (only relevant for ALAC streams)
  */
+enum class VideoCodec { H264, HEVC }
+private data class Quadruple<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
 data class SessionDescription(
     val hasVideo: Boolean,
     val hasAudio: Boolean,
     val videoPort: Int = 0,
     val videoPayloadType: Int = 96,
+    val videoCodec: VideoCodec = VideoCodec.H264,
+    val vpsBytes: ByteArray? = null,
     val spsBytes: ByteArray? = null,
     val ppsBytes: ByteArray? = null,
     val h264ProfileLevelId: String? = null,
