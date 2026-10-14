@@ -1,1 +1,1 @@
-{"_comment":"CastLink OTA","apkUrl":"https://github.com/programmerguohuajing/castlink/releases/download/v0.1.35/CastLink-v0.1.35.apk","changelog":"v0.1.35\n- 全屏 transform 日志进应用内查看器","versionCode":56,"versionName":"0.1.35"}
+{"_comment":"CastLink OTA","apkUrl":"https://github.com/programmerguohuajing/castlink/releases/download/v0.1.37/CastLink-v0.1.37.apk","changelog":"v0.1.37\n- HEVC 支持（iPhone 相册视频）\n- 发送端原生宽高比（修三星→电视黑边）","versionCode":58,"versionName":"0.1.37"}
