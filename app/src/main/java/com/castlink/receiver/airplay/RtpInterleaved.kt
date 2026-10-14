@@ -54,6 +54,41 @@ object RtpInterleaved {
     private const val RTP_FIXED_HEADER_BYTES = 12
 
     /**
+     * v0.1.38: 发送 RTCP Receiver Report（RFC 3550），告诉 iPhone 接收端活着。
+     * 不回 RR 的话 iPhone 在 RECORD 后约 1 秒断开。
+     */
+    private fun sendRtcpRr(out: java.io.OutputStream, ssrc: Int, seq: Int) {
+        try {
+            // RTCP RR: V=2, P=0, RC=1, PT=201, length=7, SSRC=our, report block
+            val rr = ByteArray(32)
+            rr[0] = 0x81.toByte()  // V=2, RC=1
+            rr[1] = 201.toByte()   // PT=RR
+            rr[2] = 0; rr[3] = 7   // length=7 (32 bytes / 4 - 1)
+            // Our SSRC (random)
+            val ourSsrc = 0x12345678
+            rr[4] = (ourSsrc shr 24).toByte(); rr[5] = (ourSsrc shr 16).toByte()
+            rr[6] = (ourSsrc shr 8).toByte(); rr[7] = ourSsrc.toByte()
+            // Report block: source SSRC
+            rr[8] = (ssrc shr 24).toByte(); rr[9] = (ssrc shr 16).toByte()
+            rr[10] = (ssrc shr 8).toByte(); rr[11] = ssrc.toByte()
+            // fraction lost=0, cumulative lost=0
+            // extended highest seq
+            rr[16] = (seq shr 24).toByte(); rr[17] = (seq shr 16).toByte()
+            rr[18] = (seq shr 8).toByte(); rr[19] = seq.toByte()
+            // jitter=0, LSR=0, DLSR=0 (already zero)
+            // Interleaved framing: $ channel=1 length
+            out.write(INTERLEAVED_MARKER)
+            out.write(1)  // channel 1 = video RTCP
+            out.write(0); out.write(32)  // length 32
+            out.write(rr)
+            out.flush()
+            Logger.d("RTCP RR sent (ssrc=$ssrc seq=$seq)")
+        } catch (e: Exception) {
+            Logger.w("RTCP RR send failed", e)
+        }
+    }
+
+    /**
      * H.264 NAL unit type 28 = FU-A (Fragmentation Unit type A).
      * Used to split a large NAL unit across multiple RTP packets (RFC 6184 §5.8).
      */
@@ -87,12 +122,18 @@ object RtpInterleaved {
      */
     fun readLoop(
         inputStream: InputStream,
+        outputStream: java.io.OutputStream? = null,
         onVideoNalUnit: (nalUnit: ByteArray, ptsUs: Long) -> Unit,
         onStreamEnded: () -> Unit
     ) {
         // FU-A (Fragmentation Unit A) reassembly state — local so concurrent streams
         // don't share state. Non-null means we are accumulating fragments for one NAL unit.
         var fuaAccumulator: ByteArrayOutputStream? = null
+        // v0.1.38: RTCP RR 统计——iPhone 收不到 RR 会在 RECORD 后 1 秒断开
+        var rtpPackets = 0
+        var rtpSsrc = 0
+        var rtpSeq = 0
+        var lastRrTime = 0L
 
         try {
             while (true) {
@@ -136,7 +177,19 @@ object RtpInterleaved {
 
                 // Only process video RTP frames (channel 0); ignore RTCP (channel 1)
                 if (channel == CHANNEL_VIDEO_RTP) {
+                    // 更新 RTCP RR 统计
+                    if (frameData.size >= 12) {
+                        rtpSsrc = ((frameData[8].toInt() and 0xFF) shl 24) or ((frameData[9].toInt() and 0xFF) shl 16) or ((frameData[10].toInt() and 0xFF) shl 8) or (frameData[11].toInt() and 0xFF)
+                        rtpSeq = ((frameData[2].toInt() and 0xFF) shl 8) or (frameData[3].toInt() and 0xFF)
+                        rtpPackets++
+                    }
                     fuaAccumulator = processVideoRtpFrame(frameData, fuaAccumulator, onVideoNalUnit)
+                    // 每 1 秒发一次 RTCP RR（channel 1）
+                    val now = System.currentTimeMillis()
+                    if (outputStream != null && now - lastRrTime >= 1000 && rtpPackets > 0) {
+                        lastRrTime = now
+                        sendRtcpRr(outputStream, rtpSsrc, rtpSeq)
+                    }
                 }
                 // Note: audio over interleaved TCP is rare in AirPlay; UDP is used instead.
             }

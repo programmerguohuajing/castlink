@@ -271,6 +271,7 @@ open class RtspHandler(
                 if (switchedToRtp && session != null && session.hasVideo && running) {
                     RtpInterleaved.readLoop(
                         inputStream = inputStream,
+                        outputStream = socket.getOutputStream(),
                         onVideoNalUnit = { nalUnit, ptsUs ->
                             onVideoNalUnit?.invoke(nalUnit, ptsUs)
                         },
