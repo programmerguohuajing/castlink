@@ -224,6 +224,9 @@ open class RtspHandler(
     }
 
     private fun handleClient(socket: Socket) {
+        // v0.1.31: 30 秒读超时，避免 iPhone 断开不干净时 handleClient 永久阻塞，
+        // accept 循环卡死，新连接（Bilibili 等 App 内 AirPlay）进不来报“无法连接”。
+        runCatching { socket.soTimeout = 30_000 }
         val inputStream = socket.getInputStream()
         val outputStream = socket.getOutputStream()
 
@@ -267,6 +270,9 @@ open class RtspHandler(
                     }
                 )
             }
+        } catch (e: java.net.SocketTimeoutException) {
+            // 30 秒无数据，客户端已断开（或僵死），正常清理，不记为错误
+            if (running) Logger.i("RTSP client idle timeout, closing")
         } catch (e: Exception) {
             if (running) Logger.e("Error handling RTSP client", e)
         } finally {
