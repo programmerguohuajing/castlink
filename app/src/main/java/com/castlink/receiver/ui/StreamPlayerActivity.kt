@@ -91,6 +91,12 @@ class StreamPlayerActivity : BaseActivity() {
     private fun startPipeline(surface: Surface) {
         if (!surface.isValid) return
         val pipe = VideoPipeline(surface)
+        // v0.1.33: 注册输出尺寸回调，用解码器真实尺寸算 centerCrop（Fold3 竖屏不是 1280x720）
+        pipe.onOutputSizeChanged = { w, h ->
+            videoW = w.toFloat()
+            videoH = h.toFloat()
+            runOnUiThread { updateCropTransform() }
+        }
         // 发送端为 720p H.264；SPS/PPS 走带内（in-band），解码器从码流中获取
         pipe.configure("video/avc", 1280, 720)
         pipeline = pipe
