@@ -82,7 +82,7 @@ object RtpInterleaved {
             out.write(0); out.write(32)  // length 32
             out.write(rr)
             out.flush()
-            Logger.d("RTCP RR sent (ssrc=$ssrc seq=$seq)")
+            Logger.i("[AirPlay 9/9] RTCP RR sent, video flowing (ssrc=$ssrc seq=$seq)")
         } catch (e: Exception) {
             Logger.w("RTCP RR send failed", e)
         }
@@ -177,6 +177,8 @@ object RtpInterleaved {
 
                 // Only process video RTP frames (channel 0); ignore RTCP (channel 1)
                 if (channel == CHANNEL_VIDEO_RTP) {
+                    // 首个视频包
+                    if (rtpPackets == 0) Logger.i("[AirPlay 7/9] First video RTP packet received (${frameData.size} bytes)")
                     // 更新 RTCP RR 统计
                     if (frameData.size >= 12) {
                         rtpSsrc = ((frameData[8].toInt() and 0xFF) shl 24) or ((frameData[9].toInt() and 0xFF) shl 16) or ((frameData[10].toInt() and 0xFF) shl 8) or (frameData[11].toInt() and 0xFF)

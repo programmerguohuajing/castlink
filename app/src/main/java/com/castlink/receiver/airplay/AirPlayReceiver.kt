@@ -292,7 +292,7 @@ class AirPlayReceiver(
      * - audio-only:   only [AudioPlayer], app stays on HomeScreen
      */
     private fun onStreamingStarted(session: SessionDescription) {
-        Logger.i("Streaming started — video=${session.hasVideo} audio=${session.hasAudio} " +
+        Logger.i("[AirPlay 7/9] Streaming started — video=${session.hasVideo} audio=${session.hasAudio} codec=${session.videoCodec} " +
                  "audioOnly=${session.isAudioOnly}")
 
         scope.launch {
@@ -379,7 +379,7 @@ class AirPlayReceiver(
                 if (sps != null && pps != null && !decoder.isInitialized) {
                     try {
                         decoder.initialize(sps, pps, DEFAULT_VIDEO_WIDTH, DEFAULT_VIDEO_HEIGHT, session.vpsBytes)
-                        Logger.i("VideoDecoder initialized from " + if (spsFromSdp != null) "SDP" else "in-band")
+                        Logger.i("[AirPlay 8/9] VideoDecoder initialized (${session.videoCodec}) from " + if (spsFromSdp != null) "SDP" else "in-band")
                     } catch (e: Exception) {
                         Logger.e("VideoDecoder init failed", e)
                     }

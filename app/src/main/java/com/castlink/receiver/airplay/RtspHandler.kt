@@ -202,7 +202,7 @@ open class RtspHandler(
 
             while (running && scope.isActive) {
                 val clientSocket = serverSocket!!.accept()
-                Logger.i("New client connected: ${clientSocket.inetAddress.hostAddress}")
+                Logger.i("[AirPlay 1/9] New client connected: ${clientSocket.inetAddress.hostAddress}")
 
                 if (activeClient != null && !activeClient!!.isClosed) {
                     Logger.w("Rejecting second client — already streaming")
@@ -306,7 +306,10 @@ open class RtspHandler(
     }
 
     private fun routeRequest(request: RtspRequest): RtspResponse {
-        Logger.d("RTSP ${request.method} ${request.uri}")
+        Logger.i("[AirPlay 3/9] RTSP ${request.method} ${request.uri}")
+        if (request.method == "ANNOUNCE") {
+            Logger.i("[AirPlay 4/9] ANNOUNCE body ${request.body.length} bytes")
+        }
         // Senders attach their DACP reverse-control identity to most requests — capture it so the TV
         // remote can drive playback (DacpClient dedups, so this is cheap to call repeatedly).
         request.headers["Active-Remote"]?.let { onRemoteControlInfo(request.headers["DACP-ID"], it) }
@@ -314,8 +317,14 @@ open class RtspHandler(
             "OPTIONS"       -> handleOptionsInternal(request)
             "ANNOUNCE"      -> handleAnnounceInternal(request)
             // AirPlay 2 mirroring SETUP carries a binary plist; legacy audio SETUP carries SDP-ish text.
-            "SETUP"         -> if (request.isPlistBody()) handleMirrorSetup(request) else handleSetupInternal(request)
-            "RECORD"        -> handleRecordInternal(request)
+            "SETUP"         -> {
+                Logger.i("[AirPlay 5/9] SETUP streams")
+                if (request.isPlistBody()) handleMirrorSetup(request) else handleSetupInternal(request)
+            }
+            "RECORD"        -> {
+                Logger.i("[AirPlay 6/9] RECORD - streaming starting")
+                handleRecordInternal(request)
+            }
             "TEARDOWN"      -> handleTeardownInternal(request)
             "GET_PARAMETER" -> handleGetParameter(request)
             "SET_PARAMETER" -> handleSetParameter(request)
@@ -346,7 +355,7 @@ open class RtspHandler(
 
     /** Routes AirPlay 2 POST requests by URI path. */
     private fun routePost(request: RtspRequest): RtspResponse = when (request.uri.substringBefore("?")) {
-        "/pair-setup"  -> handlePairSetup(request)
+        "/pair-setup" -> handlePairSetup(request) // [AirPlay 2/9] Pairing
         "/pair-setup-pin" -> handleLegacyPairSetupPin(request)   // legacy AirPlay PIN SRP (plist)
         "/pair-pin-start" -> handlePairPinStart(request)
         "/pair-verify" -> handlePairVerify(request)
@@ -354,7 +363,7 @@ open class RtspHandler(
         "/feedback"    -> handleFeedback(request)
         "/audioMode"   -> RtspResponse(200, "OK", protocol = request.responseProtocol())
         // AirPlay video URL mode (non-mirroring): play a URL + drive transport.
-        "/play"        -> handleVideoPlay(request)
+        "/play" -> handleVideoPlay(request) // [AirPlay 5/9] In-app AirPlay URL
         "/rate"        -> handleVideoRate(request)
         "/scrub"       -> handleVideoScrubPost(request)
         "/stop"        -> handleVideoStop(request)
