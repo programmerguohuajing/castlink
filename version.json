@@ -1,1 +1,1 @@
-{"_comment":"CastLink OTA","apkUrl":"https://github.com/programmerguohuajing/castlink/releases/download/v0.1.30/CastLink-v0.1.30.apk","changelog":"v0.1.30\n- AirPlay 照片显示\n- TV PIN 布局左侧/右侧\n- 全屏真实尺寸\n- 看门狗 30s","versionCode":51,"versionName":"0.1.30"}
+{"_comment":"CastLink OTA","apkUrl":"https://github.com/programmerguohuajing/castlink/releases/download/v0.1.31/CastLink-v0.1.31.apk","changelog":"v0.1.31\n- RTSP Socket 超时，修 App 内 AirPlay 无法连接","versionCode":52,"versionName":"0.1.31"}
