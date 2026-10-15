@@ -1,1 +1,1 @@
-{"_comment":"CastLink OTA","apkUrl":"https://github.com/programmerguohuajing/castlink/releases/download/v0.1.40/CastLink-v0.1.40.apk","changelog":"v0.1.40\n- AirPlay 全链路步骤日志 [1/9]-[9/9]","versionCode":61,"versionName":"0.1.40"}
+{"_comment":"CastLink OTA","apkUrl":"https://github.com/programmerguohuajing/castlink/releases/download/v0.1.41/CastLink-v0.1.41.apk","changelog":"v0.1.41\n- DLNA DMR 投屏：腾讯视频/爱奇艺/优酷/哔哩哔哩等 App 可发现 CastLink-TV 并投屏\n- ExoPlayer 播放内核：HLS 多码率自适应、防盗链 Header 动态注入\n- 与 AirPlay 同一前台服务托管；通知文案更新","versionCode":62,"versionName":"0.1.41"}

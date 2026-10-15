@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- DLNA DMR 全屏播放页（文档 §3.4）：TextureView 渲染 + OSD 浮层（片名/进度条/加载圈） -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FF000000">
+
+    <TextureView
+        android:id="@+id/dlna_texture"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <!-- 缓冲 Loading 圈 -->
+    <ProgressBar
+        android:id="@+id/dlna_loading"
+        android:layout_width="64dp"
+        android:layout_height="64dp"
+        android:layout_gravity="center"
+        android:visibility="gone" />
+
+    <!-- 播放错误提示 -->
+    <TextView
+        android:id="@+id/dlna_error"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:layout_margin="32dp"
+        android:textColor="#FFFF6B6B"
+        android:textSize="18sp"
+        android:gravity="center"
+        android:visibility="gone" />
+
+    <!-- OSD 控制栏：片名 + 进度条 + 时间 -->
+    <LinearLayout
+        android:id="@+id/dlna_osd"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:orientation="vertical"
+        android:padding="16dp"
+        android:background="#AA000000"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/dlna_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="#FFFFFFFF"
+            android:textSize="20sp"
+            android:singleLine="true"
+            android:ellipsize="end" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="8dp">
+
+            <TextView
+                android:id="@+id/dlna_pos"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#FFCCCCCC"
+                android:textSize="14sp"
+                android:text="00:00:00" />
+
+            <SeekBar
+                android:id="@+id/dlna_seek"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="12dp"
+                android:layout_marginEnd="12dp"
+                android:max="1000" />
+
+            <TextView
+                android:id="@+id/dlna_dur"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#FFCCCCCC"
+                android:textSize="14sp"
+                android:text="00:00:00" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:textColor="#FF999999"
+            android:textSize="12sp"
+            android:text="⏯ 确定：播放/暂停　◀ ▶：快退/快进 10 秒　返回：停止投屏" />
+    </LinearLayout>
+</FrameLayout>

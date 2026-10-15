@@ -9,6 +9,7 @@ import android.os.Build
 import android.os.IBinder
 import com.castlink.receiver.R
 import com.castlink.receiver.airplay.util.Logger
+import com.castlink.receiver.dlna.DlnaServer
 
 /**
  * AirPlayService — CastLink 自有代码（非移植）。前台 Service，持有移植来的
@@ -20,6 +21,8 @@ import com.castlink.receiver.airplay.util.Logger
 class AirPlayService : Service() {
 
     private var receiver: AirPlayReceiver? = null
+    // v0.1.41：DLNA DMR 引擎与 AirPlay 同一前台服务托管（DLNA-DMR-INTEGRATION-PLAN.md §3.1）
+    private var dlnaServer: DlnaServer? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -28,6 +31,9 @@ class AirPlayService : Service() {
         // 与待机页/设置页保持一致：无用户自定义名时用默认名 CastLink-TV，
         // 不再退到系统机型名（新装机上曾广播成 E900V22C，导致 iPhone 选错设备）
         val deviceName = com.castlink.receiver.util.DeviceName.resolve(this)
+
+        // DLNA DMR：SSDP 发现（UDP 1900）+ HTTP 描述/控制（TCP 8758）
+        dlnaServer = DlnaServer(this).also { it.start(deviceName) }
 
         receiver = AirPlayReceiver(
             context = this,
@@ -50,6 +56,9 @@ class AirPlayService : Service() {
     }
 
     override fun onDestroy() {
+        // DLNA 先下线：ssdp:byebye 宣告，避免手机端残留已消失的设备
+        runCatching { dlnaServer?.stop() }
+        dlnaServer = null
         runCatching { receiver?.stop() }
         receiver = null
         Logger.i("AirPlayService destroyed")

@@ -217,7 +217,8 @@
     <string name="btn_back">返回</string>
     <string name="airplay_notif_channel">AirPlay</string>
     <string name="airplay_notif_title">CastLink AirPlay</string>
-    <string name="airplay_notif_text">AirPlay 接收已开启</string>
+    <!-- v0.1.41：统一前台服务同时托管 AirPlay + DLNA DMR（DLNA-DMR-INTEGRATION-PLAN.md §3.1） -->
+    <string name="airplay_notif_text">CastLink 接收服务运行中：支持隔空播放与流媒体投屏</string>
     <string name="on">开</string>
     <string name="off">关</string>
 </resources>

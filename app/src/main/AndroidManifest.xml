@@ -67,6 +67,12 @@
             android:exported="false"
             android:screenOrientation="landscape" />
 
+        <!-- v0.1.41：DLNA DMR 全屏播放页（ExoPlayer） -->
+        <activity
+            android:name=".dlna.ui.DlnaPlayerActivity"
+            android:exported="false"
+            android:screenOrientation="landscape" />
+
         <service
             android:name=".airplay.AirPlayService"
             android:exported="false"

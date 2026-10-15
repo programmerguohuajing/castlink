@@ -47,3 +47,30 @@ echo; echo "=== FilePushEdgeTest ==="
 "$JAVA_HOME/bin/java" -cp "$RUN_CP" FilePushEdgeTestKt
 echo; echo "=== AlacDecoderTest ==="
 "$JAVA_HOME/bin/java" -cp "$RUN_CP" AlacDecoderTestKt
+
+# v0.1.41 DLNA DMR：纯逻辑层 JVM 测试（SSDP/SOAP/DIDL/状态机/HTTP roundtrip，不引 android.jar）
+echo; echo "=== DLNA 逻辑层编译 ==="
+DOUT=/tmp/jvmtest-dlna-out
+rm -rf "$DOUT"; mkdir -p "$DOUT"
+DLNA_SRC=$SRC/dlna
+"$JAVA_HOME/bin/java" -cp "$KOTLINC_CP" \
+  org.jetbrains.kotlin.cli.jvm.K2JVMCompiler \
+  -no-stdlib -cp "$STDLIB" \
+  -jvm-target 17 \
+  -d "$DOUT" \
+  "$DLNA_SRC/util/DlnaTime.kt" \
+  "$DLNA_SRC/ssdp/SsdpPacket.kt" \
+  "$DLNA_SRC/ssdp/SsdpServer.kt" \
+  "$DLNA_SRC/service/DidlParser.kt" \
+  "$DLNA_SRC/service/SoapCodec.kt" \
+  "$DLNA_SRC/service/DlnaControl.kt" \
+  "$DLNA_SRC/service/AvTransportService.kt" \
+  "$DLNA_SRC/service/RenderingControlService.kt" \
+  "$DLNA_SRC/service/ConnectionManagerService.kt" \
+  "$DLNA_SRC/service/SoapDispatcher.kt" \
+  "$DLNA_SRC/server/DeviceDescription.kt" \
+  "$DLNA_SRC/server/ScpdDescriptions.kt" \
+  "$DLNA_SRC/server/DlnaHttpServer.kt" \
+  "$TESTS/DlnaLogicTest.kt" 2>&1 | grep -v "^warning" || true
+echo; echo "=== DlnaLogicTest ==="
+"$JAVA_HOME/bin/java" -cp "$DOUT:$STDLIB" DlnaLogicTestKt

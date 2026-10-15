@@ -6,7 +6,9 @@ T=~/toolchains
 export JAVA_HOME="$T/jdk17"
 export PATH="$JAVA_HOME/bin:$PATH"
 SDK="$T/android-sdk"
-BT="$SDK/build-tools/34.0.0"
+# v0.1.41：build-tools 34 的 d8（R8 8.2.2）解析 Media3 匿名内部类时 NPE 崩溃，
+# 换 36.0.0（自 diplay-backport 工具链拷入，见 AGENTS.md）。
+BT="$SDK/build-tools/36.0.0"
 AJAR="$SDK/platforms/android-34/android.jar"
 M2="$HOME/toolchains/m2repo"
 KOTLINC_JAR="$M2/org/jetbrains/kotlin/kotlin-compiler-embeddable/2.0.21/kotlin-compiler-embeddable-2.0.21.jar"
@@ -17,12 +19,32 @@ COROUTINES_CORE="$M2/org/jetbrains/kotlinx/kotlinx-coroutines-core-jvm/1.6.4/kot
 COROUTINES_ANDROID="$M2/org/jetbrains/kotlinx/kotlinx-coroutines-android/1.6.4/kotlinx-coroutines-android-1.6.4.jar"
 BCPROV="$M2/org/bouncycastle/bcprov-jdk18on/1.78.1/bcprov-jdk18on-1.78.1.jar"
 DDPLIST="$M2/com/googlecode/plist/dd-plist/1.28/dd-plist-1.28.jar"
-APP_CP="$AJAR:$STDLIB:$ZXING:$COROUTINES_CORE:$COROUTINES_ANDROID:$BCPROV:$DDPLIST"
+# v0.1.41 DLNA DMR：Media3 / ExoPlayer 最小依赖集（HLS + MP4 播放内核，
+# 依赖清单见 DLNA-DMR-INTEGRATION-PLAN.md §4.1，用 tools/fetch_media3.py 拉取。
+# 注意：AAR 已预解出 classes.jar；guava 用完整版，listenablefuture/concurrent-futures
+# 不再单独加（与 guava-android 里的类重复，d8 会报 duplicate class）。）
+M3V="1.11.1"
+M3="$M2/androidx/media3"
+EXO_CP="$M3/media3-common/$M3V/media3-common-$M3V-classes.jar"
+EXO_CP="$EXO_CP:$M3/media3-datasource/$M3V/media3-datasource-$M3V-classes.jar"
+EXO_CP="$EXO_CP:$M3/media3-decoder/$M3V/media3-decoder-$M3V-classes.jar"
+EXO_CP="$EXO_CP:$M3/media3-container/$M3V/media3-container-$M3V-classes.jar"
+EXO_CP="$EXO_CP:$M3/media3-database/$M3V/media3-database-$M3V-classes.jar"
+EXO_CP="$EXO_CP:$M3/media3-extractor/$M3V/media3-extractor-$M3V-classes.jar"
+EXO_CP="$EXO_CP:$M3/media3-exoplayer/$M3V/media3-exoplayer-$M3V-classes.jar"
+EXO_CP="$EXO_CP:$M3/media3-exoplayer-hls/$M3V/media3-exoplayer-hls-$M3V-classes.jar"
+EXO_CP="$EXO_CP:$M2/androidx/annotation/annotation/1.6.0/annotation-1.6.0.jar"
+EXO_CP="$EXO_CP:$M2/androidx/annotation/annotation-experimental/1.3.1/annotation-experimental-1.3.1-classes.jar"
+EXO_CP="$EXO_CP:$M2/androidx/exifinterface/exifinterface/1.3.6/exifinterface-1.3.6-classes.jar"
+EXO_CP="$EXO_CP:$M2/com/google/guava/guava/33.3.1-android/guava-33.3.1-android.jar"
+EXO_CP="$EXO_CP:$M2/com/google/guava/failureaccess/1.0.2/failureaccess-1.0.2.jar"
+EXO_CP="$EXO_CP:$M2/com/google/j2objc/j2objc-annotations/1.3/j2objc-annotations-1.3.jar"
+APP_CP="$AJAR:$STDLIB:$ZXING:$COROUTINES_CORE:$COROUTINES_ANDROID:$BCPROV:$DDPLIST:$EXO_CP"
 
 PROJ=~/workspace/castlink
 OUT=$PROJ/build/manual
-VERSION_NAME="0.1.40"
-VERSION_CODE=61
+VERSION_NAME="0.1.41"
+VERSION_CODE=62
 APK_NAME="CastLink-v${VERSION_NAME}.apk"
 rm -rf "$OUT"
 mkdir -p "$OUT/gen" "$OUT/classes" "$OUT/dex"
@@ -67,7 +89,8 @@ echo "=== [4/8] d8 (.class -> classes.dex) ==="
   --lib "$AJAR" \
   --output "$OUT/dex" \
   $(find "$OUT/classes" -name "*.class") \
-  "$STDLIB" "$ZXING" "$COROUTINES_CORE" "$COROUTINES_ANDROID" "$BCPROV" "$DDPLIST"
+  "$STDLIB" "$ZXING" "$COROUTINES_CORE" "$COROUTINES_ANDROID" "$BCPROV" "$DDPLIST" \
+  $(echo "$EXO_CP" | tr ':' ' ')
 ls -la "$OUT/dex/"
 
 echo "=== [5/8] 打包 classes.dex + libplayfair.so 进 APK ==="

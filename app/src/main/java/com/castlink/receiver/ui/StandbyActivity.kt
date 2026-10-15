@@ -348,6 +348,20 @@ class StandbyActivity : BaseActivity() {
         }
     }
 
+    /**
+     * v0.1.41：DLNA 补拉。Android 10+ 后台启动 Activity 受限，SetAVTransportURI 到达时
+     * 若 App 在后台，DlnaMediaBridge.launchPlayer() 可能被系统拦截；回到前台的待机页
+     * 在 onResume 里补拉一次，保证投屏一定能起播放页。
+     */
+    override fun onResume() {
+        super.onResume()
+        runCatching {
+            if (com.castlink.receiver.dlna.DlnaMediaBridge.needsPlayer()) {
+                com.castlink.receiver.dlna.DlnaMediaBridge.launchPlayer()
+            }
+        }
+    }
+
     /** AirPlay 照片（PUT /photo）：空数组=清空隐藏，非空=解码显示。 */
     private fun onAirPlayPhoto(bytes: ByteArray) {
         runOnUiThread {
