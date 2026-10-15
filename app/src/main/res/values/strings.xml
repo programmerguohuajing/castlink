@@ -178,12 +178,21 @@
     <string name="quality_1080p">1080p60</string>
     <string name="quality_720p">720p30</string>
     <string name="setting_prefer_5g">优先 5GHz</string>
-    <string name="setting_legacy_mode">Legacy Android 4 接收模式（限720p）</string>
+    <string name="setting_prefer_5g_desc">自动检测双频网络并优先提示连接 5GHz 频段以降低延迟</string>
+    <string name="setting_legacy_mode">兼容模式（限 720p）</string>
+    <string name="setting_legacy_mode_desc">降低编码复杂度，提升老旧安卓电视盒子的播放稳定性</string>
     <string name="setting_device_name">设备名</string>
+    <string name="setting_device_name_desc">用于局域网广播设备标识（AirPlay、DLNA 与自有协议统一）</string>
     <string name="device_name_hint">输入设备名</string>
     <string name="btn_save">保存</string>
     <string name="device_name_saved">设备名已保存</string>
     <string name="default_device_name">CastLink-TV</string>
+    <string name="setting_section_device">设备与网络</string>
+    <string name="setting_section_quality">投屏与画质</string>
+    <string name="setting_section_protocol">协议与安全</string>
+    <string name="setting_section_system">系统与维护</string>
+    <string name="setting_view_logs">查看日志</string>
+    <string name="setting_apply_mirror">应用镜像</string>
 
     <!-- 发送端 -->
     <string name="title_sender">发送端投屏</string>

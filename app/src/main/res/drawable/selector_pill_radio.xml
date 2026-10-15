@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 胶囊分段单选按钮背景 -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 选中状态 -->
+    <item android:state_checked="true" android:state_focused="true">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/nebula_cyan" />
+            <stroke
+                android:width="2dp"
+                android:color="@color/white" />
+            <corners android:radius="10dp" />
+        </shape>
+    </item>
+    <item android:state_checked="true">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/nebula_cyan" />
+            <corners android:radius="10dp" />
+        </shape>
+    </item>
+    <!-- 未选中但在遥控器焦点上 -->
+    <item android:state_focused="true">
+        <shape android:shape="rectangle">
+            <solid android:color="#24345C" />
+            <stroke
+                android:width="2dp"
+                android:color="@color/nebula_cyan" />
+            <corners android:radius="10dp" />
+        </shape>
+    </item>
+    <!-- 普通未选中 -->
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#141E38" />
+            <stroke
+                android:width="1dp"
+                android:color="#263A5E" />
+            <corners android:radius="10dp" />
+        </shape>
+    </item>
+</selector>

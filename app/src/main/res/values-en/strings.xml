@@ -178,12 +178,21 @@ Open the URL on the standby screen (e.g. http://192.168.1.x:8756) in a browser a
     <string name="quality_1080p">1080p60</string>
     <string name="quality_720p">720p30</string>
     <string name="setting_prefer_5g">Prefer 5 GHz</string>
-    <string name="setting_legacy_mode">Legacy Android 4 receive mode (720p max)</string>
+    <string name="setting_prefer_5g_desc">Detect dual-band Wi-Fi and prefer 5GHz band for lower casting latency</string>
+    <string name="setting_legacy_mode">Compatibility Mode (720p)</string>
+    <string name="setting_legacy_mode_desc">Reduce stream complexity for older Android TV boxes</string>
     <string name="setting_device_name">Device name</string>
+    <string name="setting_device_name_desc">Identifier broadcast on local network (AirPlay, DLNA, and native)</string>
     <string name="device_name_hint">Enter device name</string>
     <string name="btn_save">Save</string>
     <string name="device_name_saved">Device name saved</string>
     <string name="default_device_name">CastLink-TV</string>
+    <string name="setting_section_device">Device &amp; Network</string>
+    <string name="setting_section_quality">Display &amp; Quality</string>
+    <string name="setting_section_protocol">Protocols &amp; Security</string>
+    <string name="setting_section_system">System &amp; Maintenance</string>
+    <string name="setting_view_logs">View Logs</string>
+    <string name="setting_apply_mirror">Apply Mirror</string>
 
     <!-- Sender -->
     <string name="title_sender">Cast Screen</string>

@@ -4,13 +4,16 @@ import android.app.AlertDialog
 import android.content.SharedPreferences
 import android.os.Build
 import android.os.Bundle
+import android.view.KeyEvent
+import android.view.View
 import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.EditText
+import android.widget.ImageButton
 import android.widget.LinearLayout
+import android.widget.RadioButton
 import android.widget.RadioGroup
 import android.widget.Spinner
-import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
 import com.castlink.receiver.R
@@ -19,7 +22,10 @@ import com.castlink.receiver.update.UpdatePrefs
 import com.castlink.receiver.util.LocaleHelper
 
 /**
- * 设置页（UI-04）：语言切换、本机能力卡、画质单选、开关项、设备名。
+ * 设置页（UI-04）：语言切换、本机能力卡、画质单选、开关项、设备名与系统维护。
+ *
+ * 采用 NEBULA 深空玻璃态 (Glassmorphic) 设计系统，全量定制卡片、胶囊分段器与开关项，
+ * 并支持触屏与 TV 电视遥控器 D-pad 双模交互。
  */
 class SettingsActivity : BaseActivity() {
 
@@ -31,6 +37,11 @@ class SettingsActivity : BaseActivity() {
         setContentView(R.layout.activity_settings)
         prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
 
+        // 返回按钮
+        findViewById<ImageButton>(R.id.btn_settings_back)?.setOnClickListener {
+            finish()
+        }
+
         // 语言：副标题显示当前生效语言，点击弹单选对话框
         tvLangSummary = findViewById(R.id.tv_lang_summary)
         tvLangSummary.text = LocaleHelper.getDisplayName(this)
@@ -38,7 +49,7 @@ class SettingsActivity : BaseActivity() {
             showLanguageDialog()
         }
 
-        // 画质单选（持久化）
+        // 画质分段胶囊单选（持久化）
         val rgQuality = findViewById<RadioGroup>(R.id.rg_quality)
         val quality = prefs.getString(KEY_QUALITY, QUALITY_AUTO) ?: QUALITY_AUTO
         rgQuality.check(
@@ -59,31 +70,37 @@ class SettingsActivity : BaseActivity() {
             prefs.edit().putString(KEY_QUALITY, value).apply()
         }
 
-        // 优先 5GHz（持久化）——TV 遥控器用 Button 开关
+        // 优先 5GHz（持久化）——支持整行点击与胶囊按钮点击
         val btnPrefer5g = findViewById<Button>(R.id.btn_prefer_5g)
         fun refreshPrefer5g() {
             val on = prefs.getBoolean(KEY_PREFER_5G, false)
-            btnPrefer5g.text = getString(R.string.setting_prefer_5g) + "：" + getString(if (on) R.string.on else R.string.off)
+            updatePillState(btnPrefer5g, on)
         }
         refreshPrefer5g()
-        btnPrefer5g.setOnClickListener {
-            prefs.edit().putBoolean(KEY_PREFER_5G, !prefs.getBoolean(KEY_PREFER_5G, false)).apply()
+        val togglePrefer5g = {
+            val current = prefs.getBoolean(KEY_PREFER_5G, false)
+            prefs.edit().putBoolean(KEY_PREFER_5G, !current).apply()
             refreshPrefer5g()
         }
+        btnPrefer5g.setOnClickListener { togglePrefer5g() }
+        findViewById<View>(R.id.row_prefer_5g)?.setOnClickListener { togglePrefer5g() }
 
-        // Legacy Android 4 接收模式（限 720p）——TV 遥控器用 Button 开关
+        // Legacy Android 4 接收模式（限 720p）——支持整行点击与胶囊按钮点击
         val btnLegacy = findViewById<Button>(R.id.btn_legacy_mode)
         fun refreshLegacy() {
             val on = prefs.getBoolean(KEY_LEGACY_MODE, false)
-            btnLegacy.text = getString(R.string.setting_legacy_mode) + "：" + getString(if (on) R.string.on else R.string.off)
+            updatePillState(btnLegacy, on)
         }
         refreshLegacy()
-        btnLegacy.setOnClickListener {
-            prefs.edit().putBoolean(KEY_LEGACY_MODE, !prefs.getBoolean(KEY_LEGACY_MODE, false)).apply()
+        val toggleLegacy = {
+            val current = prefs.getBoolean(KEY_LEGACY_MODE, false)
+            prefs.edit().putBoolean(KEY_LEGACY_MODE, !current).apply()
             refreshLegacy()
         }
+        btnLegacy.setOnClickListener { toggleLegacy() }
+        findViewById<View>(R.id.row_legacy_mode)?.setOnClickListener { toggleLegacy() }
 
-        // 设备名（持久化，供 mDNS 广播用）
+        // 设备名（持久化，供 mDNS / AirPlay / DLNA 广播用）
         val etDeviceName = findViewById<EditText>(R.id.et_device_name)
         etDeviceName.setText(
             prefs.getString(KEY_DEVICE_NAME, getString(R.string.default_device_name))
@@ -96,88 +113,113 @@ class SettingsActivity : BaseActivity() {
             }
         }
 
-        // v0.3.12：在线更新
+        // 在线更新
         setupUpdateSection()
 
-        // v0.1.1 (issue #1)：AirPlay 配对
+        // AirPlay 配对
         setupAirPlaySection()
 
-        // v0.1.26: 手动 D-pad 焦点控制（TV 上系统焦点搜索不可靠，经常跳过按钮）
+        // 手动 D-pad 焦点控制（兼容 TV 遥控器）
         setupManualDpad()
     }
 
+    /** 更新开/关状态胶囊样式 */
+    private fun updatePillState(button: Button, on: Boolean) {
+        button.text = getString(if (on) R.string.on else R.string.off)
+        if (on) {
+            button.setBackgroundResource(R.drawable.bg_toggle_pill_on)
+            button.setTextColor(getColor(R.color.nebula_cyan))
+        } else {
+            button.setBackgroundResource(R.drawable.bg_toggle_pill_off)
+            button.setTextColor(getColor(R.color.nebula_text_2ry))
+        }
+    }
+
     /**
-     * v0.1.26: 手动 D-pad 焦点链。按布局从上到下顺序，UP/DOWN 移动焦点，
-     * CENTER/ENTER 触发点击。彻底绕开系统的焦点搜索算法。
+     * 手动 D-pad 焦点链。按布局从上到下顺序，UP/DOWN 移动焦点，
+     * CENTER/ENTER 触发点击。
      */
     private var dpadFocusIndex = 0
-    private lateinit var dpadFocusList: List<android.view.View>
+    private lateinit var dpadFocusList: List<View>
 
     private fun setupManualDpad() {
         dpadFocusList = listOfNotNull(
-            findViewById<android.view.View>(R.id.row_language),
-            findViewById<android.view.View>(R.id.btn_prefer_5g),
-            findViewById<android.view.View>(R.id.btn_legacy_mode),
-            findViewById<android.view.View>(R.id.et_device_name),
-            findViewById<android.view.View>(R.id.btn_save_device_name),
-            findViewById<android.view.View>(R.id.btn_skip_pair_verify),
-            findViewById<android.view.View>(R.id.btn_clear_pairings),
-            findViewById<android.view.View>(R.id.btn_auto_update),
-            findViewById<android.view.View>(R.id.btn_check_update),
-            findViewById<android.view.View>(R.id.btn_save_update_cfg)
-        ).filter { it.visibility == android.view.View.VISIBLE }
-        // 初始焦点给第一个
+            findViewById(R.id.btn_settings_back),
+            findViewById(R.id.et_device_name),
+            findViewById(R.id.btn_save_device_name),
+            findViewById(R.id.row_prefer_5g),
+            findViewById<RadioGroup>(R.id.rg_quality)?.let { rg ->
+                rg.findViewById<RadioButton>(rg.checkedRadioButtonId) ?: findViewById(R.id.rb_quality_auto)
+            },
+            findViewById(R.id.row_legacy_mode),
+            findViewById(R.id.row_skip_pair_verify),
+            findViewById(R.id.btn_clear_pairings),
+            findViewById(R.id.row_language),
+            findViewById(R.id.sp_update_mirror),
+            findViewById(R.id.btn_save_update_cfg),
+            findViewById(R.id.row_auto_update),
+            findViewById(R.id.btn_view_logs),
+            findViewById(R.id.btn_check_update)
+        ).filter { it.visibility == View.VISIBLE }
+
         dpadFocusList.firstOrNull()?.let {
             it.requestFocus()
             dpadFocusIndex = 0
         }
     }
 
-    override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent?): Boolean {
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         if (!::dpadFocusList.isInitialized || dpadFocusList.isEmpty()) {
             return super.onKeyDown(keyCode, event)
         }
         when (keyCode) {
-            android.view.KeyEvent.KEYCODE_DPAD_DOWN -> {
+            KeyEvent.KEYCODE_DPAD_DOWN -> {
                 dpadFocusIndex = (dpadFocusIndex + 1) % dpadFocusList.size
                 dpadFocusList[dpadFocusIndex].requestFocus()
                 return true
             }
-            android.view.KeyEvent.KEYCODE_DPAD_UP -> {
+            KeyEvent.KEYCODE_DPAD_UP -> {
                 dpadFocusIndex = (dpadFocusIndex - 1 + dpadFocusList.size) % dpadFocusList.size
                 dpadFocusList[dpadFocusIndex].requestFocus()
                 return true
             }
-            android.view.KeyEvent.KEYCODE_DPAD_CENTER,
-            android.view.KeyEvent.KEYCODE_ENTER -> {
+            KeyEvent.KEYCODE_DPAD_CENTER,
+            KeyEvent.KEYCODE_ENTER -> {
                 dpadFocusList.getOrNull(dpadFocusIndex)?.performClick()
                 return true
+            }
+            KeyEvent.KEYCODE_DPAD_LEFT,
+            KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                // 水平按键让系统焦点（如 RadioGroup 内部切换）自行处理
+                return super.onKeyDown(keyCode, event)
             }
         }
         return super.onKeyDown(keyCode, event)
     }
 
-    /** v0.1.1 (issue #1)：可信局域网跳过配对校验 + 清除已配对设备 */
+    /** 可信局域网跳过配对校验 + 清除已配对设备 */
     private fun setupAirPlaySection() {
         val airPlayPrefs = com.castlink.receiver.airplay.AirPlayPrefs(this)
         val btnSkip = findViewById<Button>(R.id.btn_skip_pair_verify)
         fun refreshSkip() {
-            btnSkip.text = getString(R.string.setting_skip_pair_verify) + "：" + getString(if (airPlayPrefs.skipPairVerify) R.string.on else R.string.off)
+            updatePillState(btnSkip, airPlayPrefs.skipPairVerify)
         }
         refreshSkip()
-        btnSkip.setOnClickListener {
+        val toggleSkip = {
             airPlayPrefs.skipPairVerify = !airPlayPrefs.skipPairVerify
             refreshSkip()
             Toast.makeText(this, R.string.update_cfg_saved, Toast.LENGTH_SHORT).show()
         }
+        btnSkip.setOnClickListener { toggleSkip() }
+        findViewById<View>(R.id.row_skip_pair_verify)?.setOnClickListener { toggleSkip() }
+
         findViewById<Button>(R.id.btn_clear_pairings).setOnClickListener {
-            // 清除所有已配对设备的 LTPK（castlink_pairings prefs）
             getSharedPreferences("castlink_pairings", MODE_PRIVATE).edit().clear().apply()
             Toast.makeText(this, R.string.pairings_cleared, Toast.LENGTH_LONG).show()
         }
     }
 
-    /** v0.3.12：更新源配置 + 检查更新 + 下载安装 */
+    /** 在线更新 */
     private fun setupUpdateSection() {
         val updatePrefs = UpdatePrefs(this)
         val tvVersion = findViewById<TextView>(R.id.tv_update_version)
@@ -189,19 +231,22 @@ class SettingsActivity : BaseActivity() {
         tvVersion.text = getString(R.string.update_current_version, pkg.versionName, vc)
 
         val mirrorNames = UpdateManager.MIRRORS.map { it.removePrefix("https://").removeSuffix("/") }
-        spMirror.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, mirrorNames).apply {
-            setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        spMirror.adapter = ArrayAdapter(this, R.layout.item_spinner, mirrorNames).apply {
+            setDropDownViewResource(R.layout.item_spinner_dropdown)
         }
         spMirror.setSelection(updatePrefs.mirrorIndex.coerceIn(mirrorNames.indices))
+
         val btnAuto = findViewById<Button>(R.id.btn_auto_update)
         fun refreshAuto() {
-            btnAuto.text = getString(R.string.setting_auto_update) + "：" + getString(if (updatePrefs.autoCheck) R.string.on else R.string.off)
+            updatePillState(btnAuto, updatePrefs.autoCheck)
         }
         refreshAuto()
-        btnAuto.setOnClickListener {
+        val toggleAuto = {
             updatePrefs.autoCheck = !updatePrefs.autoCheck
             refreshAuto()
         }
+        btnAuto.setOnClickListener { toggleAuto() }
+        findViewById<View>(R.id.row_auto_update)?.setOnClickListener { toggleAuto() }
 
         findViewById<Button>(R.id.btn_save_update_cfg).setOnClickListener {
             updatePrefs.mirrorIndex = spMirror.selectedItemPosition
@@ -210,7 +255,6 @@ class SettingsActivity : BaseActivity() {
         findViewById<Button>(R.id.btn_check_update).setOnClickListener {
             checkUpdate(manual = true)
         }
-        // v0.1.34: 查看日志（应用内，不导出文件）
         runCatching {
             findViewById<Button>(R.id.btn_view_logs).setOnClickListener {
                 startActivity(android.content.Intent(this, LogViewerActivity::class.java))
@@ -252,6 +296,7 @@ class SettingsActivity : BaseActivity() {
         val progressTv = TextView(this).apply {
             setPadding(48, 16, 48, 16)
             text = getString(R.string.update_ready)
+            setTextColor(getColor(R.color.nebula_text))
         }
         val dialog = AlertDialog.Builder(this)
             .setTitle(getString(R.string.update_dialog_title, info.versionName))
@@ -287,7 +332,6 @@ class SettingsActivity : BaseActivity() {
 
     override fun onResume() {
         super.onResume()
-        // recreate() 后副标题刷新
         tvLangSummary.text = LocaleHelper.getDisplayName(this)
     }
 
