@@ -6,7 +6,7 @@ import android.content.Intent
 import android.media.AudioManager
 import android.os.Build
 import android.os.Process
-import android.util.Log
+import com.castlink.receiver.dlna.util.DlnaLog
 import com.castlink.receiver.dlna.service.DidlInfo
 import com.castlink.receiver.dlna.service.DlnaControl
 import com.castlink.receiver.dlna.service.PlaybackSnapshot
@@ -64,7 +64,7 @@ object DlnaMediaBridge : DlnaControl {
         positionMs = 0
         // 文档 §3.3.1：收到合法 URL 立即 TRANSITIONING，严禁回 STOPPED
         state = TransportState.TRANSITIONING
-        Log.i(TAG, "setUri: $uri title=$trackTitle")
+        DlnaLog.i(TAG, "setUri: $uri title=$trackTitle")
         val c = controller
         if (c != null) c.openMedia(uri, trackTitle) else launchPlayer()
     }
@@ -113,6 +113,14 @@ object DlnaMediaBridge : DlnaControl {
         trackMetaData = trackMetaXml,
         trackTitle = trackTitle,
     )
+
+    override fun currentTransportActions(): String = when (state) {
+        TransportState.STOPPED -> "Play"
+        TransportState.PLAYING -> "Pause,Stop,Seek,Next,Previous"
+        TransportState.PAUSED_PLAYBACK -> "Play,Stop,Seek,Next,Previous"
+        // TRANSITIONING / NO_MEDIA_PRESENT：只允许 Stop（或无动作）
+        else -> "Stop"
+    }
 
     // ---------- DlnaControl：音量（映射系统媒体音量） ----------
 
@@ -199,7 +207,7 @@ object DlnaMediaBridge : DlnaControl {
     }
 
     fun onPlayerError(msg: String) {
-        Log.w(TAG, "player error: $msg")
+        DlnaLog.w(TAG, "player error: $msg")
         state = TransportState.STOPPED
     }
 
@@ -225,9 +233,9 @@ object DlnaMediaBridge : DlnaControl {
             val intent = Intent(ctx, DlnaPlayerActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             ctx.startActivity(intent)
-            Log.i(TAG, "DlnaPlayerActivity launch requested (foreground=${isAppForeground(ctx)})")
+            DlnaLog.i(TAG, "DlnaPlayerActivity launch requested (foreground=${isAppForeground(ctx)})")
         }.onFailure { e ->
-            Log.w(TAG, "launchPlayer failed: ${e.message}")
+            DlnaLog.w(TAG, "launchPlayer failed: ${e.message}")
         }
     }
 

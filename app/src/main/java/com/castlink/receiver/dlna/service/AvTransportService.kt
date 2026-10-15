@@ -36,6 +36,8 @@ class AvTransportService(private val control: DlnaControl) {
             "GetPositionInfo" -> getPositionInfo()
             "GetDeviceCapabilities" -> getDeviceCapabilities()
             "GetTransportSettings" -> getTransportSettings()
+            "GetCurrentTransportActions" ->
+                mapOf("Actions" to control.currentTransportActions())
             "Play" -> run { control.play(); emptyMap<String, String>() }
             "Pause" -> run { control.pause(); emptyMap<String, String>() }
             "Stop" -> run { control.stop(); emptyMap<String, String>() }

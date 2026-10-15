@@ -5,7 +5,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
-import android.util.Log
+import com.castlink.receiver.dlna.util.DlnaLog
 import android.view.KeyEvent
 import android.view.TextureView
 import android.view.View
@@ -131,7 +131,7 @@ class DlnaPlayerActivity : BaseActivity(), DlnaPlayerController {
             openMedia(pending.first, pending.second)
         } else {
             // 无待播媒体（如用户手动打开）：直接退出，避免空页面挂起
-            Log.w(TAG, "no pending media, finish")
+            DlnaLog.w(TAG, "no pending media, finish")
             finish()
         }
     }
@@ -189,7 +189,7 @@ class DlnaPlayerActivity : BaseActivity(), DlnaPlayerController {
 
             override fun onPlayerError(error: PlaybackException) {
                 val msg = "${error.errorCodeName}: ${error.message}"
-                Log.w(TAG, "player error: $msg")
+                DlnaLog.w(TAG, "player error: $msg")
                 loading.visibility = View.GONE
                 tvError.text = "播放失败\n$msg"
                 tvError.visibility = View.VISIBLE
@@ -244,7 +244,7 @@ class DlnaPlayerActivity : BaseActivity(), DlnaPlayerController {
         p.prepare()
         p.play()
         showOsd()
-        Log.i(TAG, "openMedia: $uri (hls=${isHls(uri)})")
+        DlnaLog.i(TAG, "openMedia: $uri (hls=${isHls(uri)})")
     }
 
     override fun play() {

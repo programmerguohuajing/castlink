@@ -74,6 +74,9 @@ object ScpdDescriptions {
             arg("Target", "in", "A_ARG_TYPE_SeekTarget")) +
         action("Next", arg("InstanceID", "in", "A_ARG_TYPE_InstanceID")) +
         action("Previous", arg("InstanceID", "in", "A_ARG_TYPE_InstanceID")) +
+        action("GetCurrentTransportActions",
+            arg("InstanceID", "in", "A_ARG_TYPE_InstanceID"),
+            arg("Actions", "out", "CurrentTransportActions")) +
         "</actionList>" +
         "<serviceStateTable>" +
         stateVar("TransportState", "string",
@@ -110,6 +113,7 @@ object ScpdDescriptions {
         stateVar("A_ARG_TYPE_SeekMode", "string",
             "<allowedValue>TRACK_NR</allowedValue><allowedValue>REL_TIME</allowedValue>") +
         stateVar("A_ARG_TYPE_SeekTarget", "string") +
+        stateVar("CurrentTransportActions", "string") +
         "</serviceStateTable></scpd>"
 
     private val RC = """<?xml version="1.0" encoding="utf-8"?>""" +

@@ -3,7 +3,7 @@ package com.castlink.receiver.dlna
 import android.content.Context
 import android.net.wifi.WifiManager
 import android.provider.Settings
-import android.util.Log
+import com.castlink.receiver.dlna.util.DlnaLog
 import com.castlink.receiver.dlna.server.DeviceDescription
 import com.castlink.receiver.dlna.server.DlnaHttpServer
 import com.castlink.receiver.dlna.server.ScpdDescriptions
@@ -49,7 +49,7 @@ class DlnaServer(private val appContext: Context) {
             AvTransportService(DlnaMediaBridge),
             RenderingControlService(DlnaMediaBridge),
             ConnectionManagerService(),
-            logger = { Log.i(TAG, it) },
+            logger = { DlnaLog.i(TAG, it) },
         )
 
         http = DlnaHttpServer(
@@ -64,7 +64,7 @@ class DlnaServer(private val appContext: Context) {
             soapHandler = { path, soapAction, body ->
                 dispatcher.dispatch(path, soapAction, body)
             },
-            logger = { Log.i(TAG, it) },
+            logger = { DlnaLog.i(TAG, it) },
         ).also { it.start() }
 
         runCatching {
@@ -73,19 +73,19 @@ class DlnaServer(private val appContext: Context) {
                 setReferenceCounted(true)
                 acquire()
             }
-            Log.i(TAG, "multicast lock acquired")
+            DlnaLog.i(TAG, "multicast lock acquired")
         }.onFailure { e ->
-            Log.w(TAG, "multicast lock failed: ${e.message}")
+            DlnaLog.w(TAG, "multicast lock failed: ${e.message}")
         }
 
         ssdp = SsdpServer(
             httpPort = HTTP_PORT,
             udn = udn,
             localIpProvider = { NetUtil.getLocalIp() },
-            logger = { Log.i(TAG, it) },
+            logger = { DlnaLog.i(TAG, it) },
         ).also { it.start() }
 
-        Log.i(TAG, "started (udn=$udn httpBound=${http?.isBound} ssdpBound=${ssdp?.isBound})")
+        DlnaLog.i(TAG, "started (udn=$udn httpBound=${http?.isBound} ssdpBound=${ssdp?.isBound})")
     }
 
     fun stop() {
@@ -98,7 +98,7 @@ class DlnaServer(private val appContext: Context) {
             if (lock?.isHeld == true) lock.release()
         }
         multicastLock = null
-        Log.i(TAG, "stopped")
+        DlnaLog.i(TAG, "stopped")
     }
 
     private fun loadOrCreateUdn(context: Context): String {

@@ -132,6 +132,21 @@ fun main() {
     check("media duration format", media["MediaDuration"] == "00:45:12")
     check("media PlayMedium", media["PlayMedium"] == "NETWORK")
 
+    // GetCurrentTransportActions：各状态返回的动作集（UPnP 标准动作，爱奇艺等会调）
+    fake.state = TransportState.TRANSITIONING
+    check("actions TRANSITIONING",
+        avt.handle("GetCurrentTransportActions", mapOf("InstanceID" to "0"))["Actions"] == "Stop")
+    fake.state = TransportState.PLAYING
+    check("actions PLAYING",
+        avt.handle("GetCurrentTransportActions", mapOf("InstanceID" to "0"))["Actions"] ==
+            "Pause,Stop,Seek,Next,Previous")
+    fake.state = TransportState.PAUSED_PLAYBACK
+    check("actions PAUSED",
+        avt.handle("GetCurrentTransportActions", mapOf("InstanceID" to "0"))["Actions"]?.startsWith("Play,") == true)
+    fake.state = TransportState.STOPPED
+    check("actions STOPPED",
+        avt.handle("GetCurrentTransportActions", mapOf("InstanceID" to "0"))["Actions"] == "Play")
+
     // Pause / Seek / Stop
     avt.handle("Pause", mapOf("InstanceID" to "0"))
     check("pause called", fake.paused)
@@ -196,6 +211,8 @@ fun main() {
     check("desc has 3 services", desc.split("<service>").size == 4)
     check("desc control urls", desc.contains("<controlURL>/control/avt</controlURL>"))
     check("scpd avt", (ScpdDescriptions.get("avt") ?: "").contains("<name>SetAVTransportURI</name>"))
+    check("scpd avt has GetCurrentTransportActions",
+        (ScpdDescriptions.get("avt") ?: "").contains("<name>GetCurrentTransportActions</name>"))
     check("scpd rc", (ScpdDescriptions.get("rc") ?: "").contains("<name>SetVolume</name>"))
     check("scpd cm", (ScpdDescriptions.get("cm") ?: "").contains("<name>GetProtocolInfo</name>"))
     check("scpd unknown null", ScpdDescriptions.get("xx") == null)
@@ -269,4 +286,10 @@ class FakeDlnaControl : DlnaControl {
     override fun getVolumePercent() = vol
     override fun setMuted(muted: Boolean) { mute = muted }
     override fun isMuted() = mute
+    override fun currentTransportActions(): String = when (state) {
+        TransportState.PLAYING -> "Pause,Stop,Seek,Next,Previous"
+        TransportState.PAUSED_PLAYBACK -> "Play,Stop,Seek,Next,Previous"
+        TransportState.STOPPED -> "Play"
+        else -> "Stop"
+    }
 }

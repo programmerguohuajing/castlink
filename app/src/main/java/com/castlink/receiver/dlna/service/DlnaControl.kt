@@ -19,6 +19,9 @@ interface DlnaControl {
     /** 供 GetTransportInfo / GetPositionInfo / GetMediaInfo 轮询的快照。 */
     fun snapshot(): PlaybackSnapshot
 
+    /** GetCurrentTransportActions：按当前状态返回可用动作（UPnP AVTransport 标准动作）。 */
+    fun currentTransportActions(): String
+
     // ---- RenderingControl（映射系统媒体音量） ----
     fun setVolumePercent(percent: Int)
     fun getVolumePercent(): Int
