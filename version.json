@@ -1,1 +1,1 @@
-{"_comment":"CastLink OTA","apkUrl":"https://github.com/programmerguohuajing/castlink/releases/download/v0.1.42/CastLink-v0.1.42.apk","changelog":"v0.1.42\n- 修 DLNA 投屏播放失败 ERROR_CODE_IO_CLEARTEXT_NOT_PERMITTED：允许明文 HTTP 流量（视频 CDN 多为 http 链接）","versionCode":63,"versionName":"0.1.42"}
+{"_comment":"CastLink OTA","apkUrl":"https://github.com/programmerguohuajing/castlink/releases/download/v0.1.44/CastLink-v0.1.44.apk","changelog":"v0.1.44\n- DLNA 日志接入应用内查看器（设置 → 查看日志可见 DLNA 握手过程）\n- 补 UPnP 标准接口 GetCurrentTransportActions，提升播放器兼容性","versionCode":65,"versionName":"0.1.44"}
