@@ -53,6 +53,14 @@ class VideoDecoder(private val outputSurface: Surface, private val codec: com.ca
         private set
 
     /**
+     * 解码器实际输出（渲染到 Surface）的帧数。与喂入帧数对比可区分「解码器不出帧」
+     * 与「帧已渲染但屏幕没显示」两类故障——此前日志只有喂入数，画面冻住时无从定位。
+     */
+    @Volatile
+    var framesOut = 0L
+        private set
+
+    /**
      * Initializes the MediaCodec decoder with the video stream parameters from the SDP.
      *
      * This must be called ONCE before any calls to [decodeNalUnit].
@@ -170,6 +178,13 @@ class VideoDecoder(private val outputSurface: Surface, private val codec: com.ca
             if (inputBufferIndex >= 0) {
                 // We got an input buffer — fill it with the NAL unit bytes
                 val inputBuffer = codec.getInputBuffer(inputBufferIndex)!!
+                if (nalUnit.size > inputBuffer.capacity()) {
+                    // 超过输入缓冲容量时 put() 会抛 BufferOverflowException 被泛捕获，
+                    // 日志看不出真因；这里显式记录并丢弃，避免误判为解码错误。
+                    Logger.e("VideoDecoder: NAL ${nalUnit.size}B exceeds input buffer " +
+                        "${inputBuffer.capacity()}B — dropping")
+                    return
+                }
                 inputBuffer.clear()
                 inputBuffer.put(nalUnit)
 
@@ -227,6 +242,7 @@ class VideoDecoder(private val outputSurface: Surface, private val codec: com.ca
                 // decoder → the upstream frame queue saturates → big latency + dropped (corrupt) frames.
                 // A/V alignment is handled by keeping the AUDIO path low-latency instead (AudioStreamServer).
                 codec.releaseOutputBuffer(outputBufferIndex, true)
+                framesOut++
             }
             outputBufferIndex = codec.dequeueOutputBuffer(bufferInfo, 0)
         }
@@ -302,8 +318,19 @@ class VideoDecoder(private val outputSurface: Surface, private val codec: com.ca
          */
         internal fun parseSpsResolution(sps: ByteArray): Pair<Int, Int>? {
             try {
-                if (sps.size < 4) return null
-                val reader = SpsBitReader(sps, startOffset = 1)  // skip NAL type byte (0x67)
+                // Callers pass the SPS in two shapes: raw (SDP sprop, starts with the 0x67 NAL
+                // header) and Annex-B (the mirror path prepends 00 00 00 01). Normalise first:
+                // skip the start code + NAL header byte, then strip emulation-prevention bytes
+                // (00 00 03 → 00 00). Without this, every field after the first 00 00 03 desyncs —
+                // and reading from offset 1 of an Annex-B buffer made even profile_idc come out 0
+                // (observed on iPhone SPS: "32x87392 (profile=0)").
+                var start = 0
+                if (sps.size >= 4 && sps[0].toInt() == 0 && sps[1].toInt() == 0 &&
+                    sps[2].toInt() == 0 && sps[3].toInt() == 1) start = 4
+                else if (sps.size >= 3 && sps[0].toInt() == 0 && sps[1].toInt() == 0 &&
+                    sps[2].toInt() == 1) start = 3
+                if (sps.size < start + 4) return null
+                val reader = SpsBitReader(removeEmulationPrevention(sps, start + 1), startOffset = 0)
 
                 val profileIdc = reader.readBits(8)
                 reader.readBits(8)   // constraint flags + 2 reserved zeros
@@ -397,6 +424,19 @@ class VideoDecoder(private val outputSurface: Surface, private val codec: com.ca
                 Logger.w("SPS resolution parsing failed: ${e.message} — will use hint dimensions")
                 return null
             }
+        }
+
+        /** Removes H.264 emulation-prevention bytes (00 00 03 → 00 00) from data[from..]. */
+        private fun removeEmulationPrevention(data: ByteArray, from: Int): ByteArray {
+            val out = java.io.ByteArrayOutputStream((data.size - from).coerceAtLeast(0))
+            var zeros = 0
+            for (i in from until data.size) {
+                val b = data[i].toInt() and 0xFF
+                if (zeros >= 2 && b == 0x03) { zeros = 0; continue }
+                out.write(b)
+                zeros = if (b == 0) zeros + 1 else 0
+            }
+            return out.toByteArray()
         }
 
         /**

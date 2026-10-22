@@ -5,6 +5,8 @@ import android.content.Context
 import android.content.Intent
 import android.media.AudioManager
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.os.Process
 import com.castlink.receiver.dlna.util.DlnaLog
 import com.castlink.receiver.dlna.service.DidlInfo
@@ -54,6 +56,24 @@ object DlnaMediaBridge : DlnaControl {
         appContext = context.applicationContext
     }
 
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    /**
+     * 把控制器调用切到主线程执行。SOAP 回调在 dlna-http-worker 线程，而 ExoPlayer
+     * 绑定创建线程（主线程）、View 只能主线程触摸——此前直调会抛 wrong-thread /
+     * CalledFromWrongThread 异常，SOAP 层捕获后回 501，爱奇艺遂把设备判为离线、
+     * 反复重发 SetAVTransportURI。桥内状态机在调用前已先行更新，SOAP 应答不依赖
+     * 播放器执行结果，故异步投递不改变协议语义。
+     */
+    private fun dispatchToPlayer(block: (DlnaPlayerController) -> Unit) {
+        val c = controller ?: return
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            block(c)
+        } else {
+            mainHandler.post { if (controller === c) block(c) }
+        }
+    }
+
     // ---------- DlnaControl：SOAP → 播放器 ----------
 
     override fun setUri(uri: String, meta: DidlInfo, rawDidlXml: String) {
@@ -65,13 +85,15 @@ object DlnaMediaBridge : DlnaControl {
         // 文档 §3.3.1：收到合法 URL 立即 TRANSITIONING，严禁回 STOPPED
         state = TransportState.TRANSITIONING
         DlnaLog.i(TAG, "setUri: $uri title=$trackTitle")
-        val c = controller
-        if (c != null) c.openMedia(uri, trackTitle) else launchPlayer()
+        if (controller != null) {
+            dispatchToPlayer { it.openMedia(uri, trackTitle) }
+        } else {
+            launchPlayer()
+        }
     }
 
     override fun play() {
-        val c = controller
-        if (c == null) {
+        if (controller == null) {
             if (trackUri.isNotEmpty()) {
                 state = TransportState.TRANSITIONING
                 launchPlayer()
@@ -81,28 +103,28 @@ object DlnaMediaBridge : DlnaControl {
         if (state == TransportState.PAUSED_PLAYBACK || state == TransportState.STOPPED) {
             state = TransportState.TRANSITIONING
         }
-        c.play()
+        dispatchToPlayer { it.play() }
     }
 
     override fun pause() {
         if (state == TransportState.PLAYING) state = TransportState.PAUSED_PLAYBACK
-        controller?.pause()
+        dispatchToPlayer { it.pause() }
     }
 
     override fun stop() {
         state = TransportState.STOPPED
         positionMs = 0
-        controller?.stopAndFinish()
+        dispatchToPlayer { it.stopAndFinish() }
     }
 
     override fun seekTo(positionMs: Long) {
         this.positionMs = positionMs.coerceAtLeast(0)
-        val c = controller
-        if (c == null) {
+        if (controller == null) {
             if (trackUri.isNotEmpty()) launchPlayer()
             return
         }
-        c.seekTo(this.positionMs)
+        val target = this.positionMs
+        dispatchToPlayer { it.seekTo(target) }
     }
 
     override fun snapshot(): PlaybackSnapshot = PlaybackSnapshot(

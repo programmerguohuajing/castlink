@@ -362,12 +362,19 @@ class StandbyActivity : BaseActivity() {
         }
     }
 
+    @Volatile private var airplayState: ProtocolState = ProtocolState.ADVERTISING
+
     /** AirPlay 照片（PUT /photo）：空数组=清空隐藏，非空=解码显示。 */
     private fun onAirPlayPhoto(bytes: ByteArray) {
         runOnUiThread {
             if (bytes.isEmpty()) {
                 airplayPhotoView.visibility = android.view.View.GONE
                 airplayPhotoView.setImageDrawable(null)
+                // 照片显示时把视频层置 INVISIBLE（SurfaceView 会随之销毁 Surface）；
+                // 照片清空时必须按连接状态恢复视频层，否则切回视频后 Surface 已死、
+                // 画面永远停在旧帧（解码端日志却一切正常）。
+                airplaySurfaceView.visibility =
+                    if (airplayState == ProtocolState.CONNECTED) View.VISIBLE else View.INVISIBLE
             } else {
                 val bmp = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
                 if (bmp != null) {
@@ -400,6 +407,7 @@ class StandbyActivity : BaseActivity() {
 
     /** ProtocolState → 待机页状态栏。发送端名在 CONNECTED 前由 senderNameListener 先送达。 */
     private fun onAirPlayState(state: ProtocolState) {
+        airplayState = state
         if (state == ProtocolState.CONNECTED) onCastActive()   // AirPlay 链路激活 → 恢复常亮
         runOnUiThread {
             // v0.3.10：AirPlay 镜像连上 → 视频层全屏；断开 → 藏回待机页

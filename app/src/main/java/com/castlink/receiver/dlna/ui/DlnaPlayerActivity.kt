@@ -90,6 +90,8 @@ class DlnaPlayerActivity : BaseActivity(), DlnaPlayerController {
         setContentView(R.layout.activity_dlna_player)
 
         textureView = findViewById(R.id.dlna_texture)
+        // onVideoSizeChanged 可能发生在 layout 之前（viewW=0 被跳过），尺寸就绪后补算一次
+        textureView.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> applyAspectFit() }
         loading = findViewById(R.id.dlna_loading)
         tvError = findViewById(R.id.dlna_error)
         osd = findViewById(R.id.dlna_osd)
@@ -198,26 +200,49 @@ class DlnaPlayerActivity : BaseActivity(), DlnaPlayerController {
             }
 
             override fun onVideoSizeChanged(videoSize: androidx.media3.common.VideoSize) {
-                // 等比铺满：TextureView + transform 矫正（竖屏视频不拉伸）
-                applyCenterCrop(videoSize.width, videoSize.height)
+                // 等比完整显示（fit）：TextureView + transform 矫正（不拉伸、不截断）
+                lastVideoW = videoSize.width
+                lastVideoH = videoSize.height
+                lastPixelRatio = videoSize.pixelWidthHeightRatio
+                lastRotation = videoSize.unappliedRotationDegrees
+                applyAspectFit()
             }
         })
         player = p
         handler.post(positionRunnable)
     }
 
-    /** 等比 centerCrop：参考 StreamPlayerActivity 的竖屏铺满逻辑 */
-    private fun applyCenterCrop(videoW: Int, videoH: Int) {
-        if (videoW <= 0 || videoH <= 0) return
+    // 最近一次视频尺寸（onVideoSizeChanged 可能早于 TextureView layout，重算需复用）
+    private var lastVideoW = 0
+    private var lastVideoH = 0
+    private var lastPixelRatio = 1f
+    private var lastRotation = 0
+
+    /**
+     * 等比 FIT（完整画面 + 黑边，绝不截断）。
+     *
+     * TextureView 默认把纹理拉伸铺满整个 View，所以变换只能用「相对系数 + 绕中心
+     * 缩放」：显示矩形 = (viewW*sx) × (viewH*sy)，按视频显示宽高比取能塞进 View 的
+     * 最大矩形。此前按视频像素算绝对 scale 还绕原点缩放，等于把已经铺满的画面再
+     * 放大一倍并锚在左上角——电视上只剩视频的一个角（用户实报「画面被截断」）。
+     */
+    private fun applyAspectFit() {
+        if (lastVideoW <= 0 || lastVideoH <= 0) return
         val viewW = textureView.width.toFloat()
         val viewH = textureView.height.toFloat()
-        if (viewW <= 0 || viewH <= 0) return
-        val scale = maxOf(viewW / videoW, viewH / videoH)
+        if (viewW <= 0 || viewH <= 0) return   // 尚未 layout，OnLayoutChange 会重算
+        var displayAspect = lastVideoW * lastPixelRatio / lastVideoH
+        if (lastRotation == 90 || lastRotation == 270) displayAspect = 1f / displayAspect
+        val viewAspect = viewW / viewH
+        val sx: Float
+        val sy: Float
+        if (displayAspect > viewAspect) {
+            sx = 1f; sy = viewAspect / displayAspect      // 宽绑定，上下黑边
+        } else {
+            sx = displayAspect / viewAspect; sy = 1f      // 高绑定，左右黑边
+        }
         val matrix = android.graphics.Matrix()
-        val dx = (viewW - videoW * scale) / 2f
-        val dy = (viewH - videoH * scale) / 2f
-        matrix.setScale(scale, scale)
-        matrix.postTranslate(dx, dy)
+        matrix.setScale(sx, sy, viewW / 2f, viewH / 2f)
         textureView.setTransform(matrix)
     }
 
@@ -230,6 +255,10 @@ class DlnaPlayerActivity : BaseActivity(), DlnaPlayerController {
 
     override fun openMedia(uri: String, title: String) {
         val p = player ?: return
+        // 新媒体先复位变换，避免上一条视频的 FIT 矩阵残留到新尺寸回调到达之前
+        lastVideoW = 0
+        lastVideoH = 0
+        textureView.setTransform(android.graphics.Matrix())
         currentTitle = title
         tvTitle.text = title.ifEmpty { uri.substringAfterLast('/').substringBefore('?') }
         tvError.visibility = View.GONE

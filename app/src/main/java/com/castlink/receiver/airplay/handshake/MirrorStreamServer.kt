@@ -137,8 +137,12 @@ class MirrorStreamServer(
             if (lastStatMs != 0L) StreamStats.videoFps = (300_000L / (now - lastStatMs).coerceAtLeast(1)).toInt()
             lastStatMs = now
             StreamStats.videoDropPct = framesDropped * 100 / framesIn
-            Logger.i("Video stats: in=$framesIn dropped=$framesDropped " +
-                "(${StreamStats.videoDropPct}%) queue=${queue.size}/$QUEUE_CAPACITY ${StreamStats.videoFps}fps")
+            // out= 是解码器真正渲染到 Surface 的帧数：in 涨而 out 不涨 = 解码器/Surface
+            // 环节卡死（画面冻住但网络日志一切正常），这是定位显示类冻帧的关键判据。
+            val out = decoder?.framesOut ?: -1L
+            val stall = if (out >= 0 && out < framesIn - 120) " NO-OUTPUT-STALL" else ""
+            Logger.i("Video stats: in=$framesIn out=$out dropped=$framesDropped " +
+                "(${StreamStats.videoDropPct}%) queue=${queue.size}/$QUEUE_CAPACITY ${StreamStats.videoFps}fps$stall")
         }
     }
 
