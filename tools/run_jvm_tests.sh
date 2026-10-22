@@ -68,8 +68,10 @@ DLNA_SRC=$SRC/dlna
   "$DLNA_SRC/service/RenderingControlService.kt" \
   "$DLNA_SRC/service/ConnectionManagerService.kt" \
   "$DLNA_SRC/service/SoapDispatcher.kt" \
+  "$DLNA_SRC/service/LastChange.kt" \
   "$DLNA_SRC/server/DeviceDescription.kt" \
   "$DLNA_SRC/server/ScpdDescriptions.kt" \
+  "$DLNA_SRC/server/EventManager.kt" \
   "$DLNA_SRC/server/DlnaHttpServer.kt" \
   "$TESTS/DlnaLogicTest.kt" 2>&1 | grep -v "^warning" || true
 echo; echo "=== DlnaLogicTest ==="

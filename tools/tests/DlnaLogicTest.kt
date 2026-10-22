@@ -1,6 +1,8 @@
 import com.castlink.receiver.dlna.server.DeviceDescription
 import com.castlink.receiver.dlna.server.DlnaHttpServer
+import com.castlink.receiver.dlna.server.EventManager
 import com.castlink.receiver.dlna.server.ScpdDescriptions
+import com.castlink.receiver.dlna.service.LastChange
 import com.castlink.receiver.dlna.service.AvTransportService
 import com.castlink.receiver.dlna.service.ConnectionManagerService
 import com.castlink.receiver.dlna.service.DidlInfo
@@ -254,6 +256,81 @@ fun main() {
     // 注意：前面 RC 单测已 SetVolume(80)，此处期望 80
     check("route POST RC GetVolume",
         rSoap2.code == 200 && rSoap2.body.contains("<CurrentVolume>80</CurrentVolume>"))
+
+    // ---------- GENA 事件（EventManager / LastChange） ----------
+    check("timeout Second-1800", EventManager.parseTimeout("Second-1800") == 1800)
+    check("timeout infinite -> max", EventManager.parseTimeout("Second-infinite") == 1800)
+    check("timeout Second-120", EventManager.parseTimeout("Second-120") == 120)
+    check("timeout null -> max", EventManager.parseTimeout(null) == 1800)
+    check("callbacks single",
+        EventManager.parseCallbacks("<http://192.168.1.5:9000/ev>") == listOf("http://192.168.1.5:9000/ev"))
+    check("callbacks multi",
+        EventManager.parseCallbacks("<http://a/1>, <http://b/2>").size == 2)
+    check("callbacks garbage empty", EventManager.parseCallbacks("none").isEmpty())
+
+    val snapPlaying = PlaybackSnapshot(
+        TransportState.PLAYING, 5_000, 2_754_000,
+        "http://cdn.example/v.m3u8?a=1&b=2", "<DIDL-Lite></DIDL-Lite>", "ep1",
+    )
+    val avtBody = LastChange.avtBody(snapPlaying, "Pause,Stop,Seek")
+    check("avt body is propertyset", avtBody.startsWith("<e:propertyset"))
+    check("avt body has escaped LastChange", avtBody.contains("&lt;TransportState val=\"PLAYING\"/&gt;"))
+    // URI 里的 & 在内层转义一次、外层再转义一次（接收端解一次得内层 XML）
+    check("avt body uri double-escaped amp", avtBody.contains("a=1&amp;amp;b=2"))
+    check("avt body has actions", avtBody.contains("Pause,Stop,Seek"))
+    val rcBody = LastChange.rcBody(42, true)
+    check("rc body volume", rcBody.contains("&lt;Volume channel=\"Master\" val=\"42\"/&gt;"))
+    check("rc body mute", rcBody.contains("&lt;Mute channel=\"Master\" val=\"1\"/&gt;"))
+    val cmBody = LastChange.cmBody("", "http-get:*:video/mp4:*")
+    check("cm body direct property", cmBody.contains("<SinkProtocolInfo>http-get:*:video/mp4:*</SinkProtocolInfo>"))
+
+    // 订阅生命周期：初始事件 SEQ=0 → publish SEQ=1 → 续订不重发初始 → 注销后不再发送
+    val sent = java.util.Collections.synchronizedList(mutableListOf<Triple<String, Long, String>>())
+    val em = EventManager(sender = { url, sid, seq, body ->
+        sent.add(Triple(url, seq, body)); true
+    })
+    em.initialEventProvider = { path -> if (path == "/event/avt") avtBody else null }
+    fun waitSends(n: Int): Boolean {
+        val deadline = System.currentTimeMillis() + 3000
+        while (System.currentTimeMillis() < deadline) {
+            if (sent.size >= n) return true
+            Thread.sleep(20)
+        }
+        return sent.size >= n
+    }
+    val (sid1, _) = em.subscribe(
+        "/event/avt",
+        mapOf("callback" to "<http://192.168.1.5:9000/ev>", "nt" to "upnp:event", "timeout" to "Second-1800"),
+    )
+    check("subscribe returns uuid sid", sid1.startsWith("uuid:"))
+    check("initial event sent", waitSends(1) && sent[0].second == 0L && sent[0].third == avtBody)
+    check("one subscription", em.subscriptionCount() == 1)
+    em.publish("/event/avt", rcBody)
+    check("publish seq increments", waitSends(2) && sent[1].second == 1L && sent[1].third == rcBody)
+    em.subscribe("/event/avt", mapOf("sid" to sid1, "timeout" to "Second-1800"))
+    Thread.sleep(150)
+    check("renew sends no initial", sent.size == 2)
+    em.unsubscribe(mapOf("sid" to sid1))
+    check("unsubscribe drops sub", em.subscriptionCount() == 0)
+    em.publish("/event/avt", rcBody)
+    Thread.sleep(150)
+    check("no sends after unsubscribe", sent.size == 2)
+    em.shutdown()
+
+    // 发送失败 → 订阅被注销（回调地址不可达的控制点不反复重试）
+    val em2 = EventManager(sender = { _, _, _, _ -> false })
+    em2.initialEventProvider = { avtBody }
+    em2.subscribe("/event/avt", mapOf("callback" to "<http://192.168.1.9:1/ev>", "timeout" to "Second-1800"))
+    check("failed notify drops sub", run {
+        val deadline = System.currentTimeMillis() + 3000
+        var dropped = false
+        while (System.currentTimeMillis() < deadline) {
+            if (em2.subscriptionCount() == 0) { dropped = true; break }
+            Thread.sleep(20)
+        }
+        dropped
+    })
+    em2.shutdown()
 
     println("\n=== DLNA 逻辑测试: passed=$passed failed=$failed ===")
     if (failed > 0) kotlin.system.exitProcess(1)

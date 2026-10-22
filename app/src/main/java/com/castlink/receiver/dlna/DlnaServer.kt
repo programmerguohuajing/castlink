@@ -6,9 +6,11 @@ import android.provider.Settings
 import com.castlink.receiver.dlna.util.DlnaLog
 import com.castlink.receiver.dlna.server.DeviceDescription
 import com.castlink.receiver.dlna.server.DlnaHttpServer
+import com.castlink.receiver.dlna.server.EventManager
 import com.castlink.receiver.dlna.server.ScpdDescriptions
 import com.castlink.receiver.dlna.service.AvTransportService
 import com.castlink.receiver.dlna.service.ConnectionManagerService
+import com.castlink.receiver.dlna.service.LastChange
 import com.castlink.receiver.dlna.service.RenderingControlService
 import com.castlink.receiver.dlna.service.SoapDispatcher
 import com.castlink.receiver.dlna.ssdp.SsdpServer
@@ -39,7 +41,12 @@ class DlnaServer(private val appContext: Context) {
 
     private var ssdp: SsdpServer? = null
     private var http: DlnaHttpServer? = null
+    private var events: EventManager? = null
     private var multicastLock: WifiManager.MulticastLock? = null
+
+    // 事件去重：同一 body 1 秒内不重发（状态机抖动时避免 NOTIFY 风暴）
+    @Volatile private var lastAvtEventBody: String = ""
+    @Volatile private var lastAvtEventAtMs: Long = 0
 
     fun start(deviceName: String) {
         if (ssdp != null || http != null) return
@@ -51,6 +58,38 @@ class DlnaServer(private val appContext: Context) {
             ConnectionManagerService(),
             logger = { DlnaLog.i(TAG, it) },
         )
+
+        // GENA 事件：订阅登记 + 初始事件 + 状态变更 LastChange 推送。
+        // 缺这套时事件驱动的控制点（爱奇艺）收不到 PLAYING，永远停在「连接中」
+        // 并周期性重发 SetAVTransportURI（电视端循环重播开头数秒）。
+        val eventManager = EventManager(logger = { DlnaLog.i(TAG, it) })
+        eventManager.initialEventProvider = { path ->
+            when (path) {
+                "/event/avt" -> LastChange.avtBody(
+                    DlnaMediaBridge.snapshot(),
+                    DlnaMediaBridge.currentTransportActions(),
+                )
+                "/event/rc" -> LastChange.rcBody(
+                    DlnaMediaBridge.getVolumePercent(),
+                    DlnaMediaBridge.isMuted(),
+                )
+                "/event/cm" -> LastChange.cmBody("", ConnectionManagerService.SINK_PROTOCOL_INFO)
+                else -> null
+            }
+        }
+        DlnaMediaBridge.avtEventListener = { snap ->
+            val body = LastChange.avtBody(snap, DlnaMediaBridge.currentTransportActions())
+            val now = android.os.SystemClock.uptimeMillis()
+            if (body != lastAvtEventBody || now - lastAvtEventAtMs > 1000) {
+                lastAvtEventBody = body
+                lastAvtEventAtMs = now
+                eventManager.publish("/event/avt", body)
+            }
+        }
+        DlnaMediaBridge.rcEventListener = { vol, muted ->
+            eventManager.publish("/event/rc", LastChange.rcBody(vol, muted))
+        }
+        events = eventManager
 
         http = DlnaHttpServer(
             port = HTTP_PORT,
@@ -65,6 +104,8 @@ class DlnaServer(private val appContext: Context) {
                 dispatcher.dispatch(path, soapAction, body)
             },
             logger = { DlnaLog.i(TAG, it) },
+            subscribeHandler = { path, headers -> eventManager.subscribe(path, headers) },
+            unsubscribeHandler = { headers -> eventManager.unsubscribe(headers) },
         ).also { it.start() }
 
         runCatching {
@@ -89,6 +130,10 @@ class DlnaServer(private val appContext: Context) {
     }
 
     fun stop() {
+        DlnaMediaBridge.avtEventListener = null
+        DlnaMediaBridge.rcEventListener = null
+        runCatching { events?.shutdown() }
+        events = null
         runCatching { ssdp?.stop() }
         ssdp = null
         runCatching { http?.stop() }

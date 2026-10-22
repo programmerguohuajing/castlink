@@ -17,7 +17,7 @@ import kotlin.concurrent.thread
  * - GET  /description.xml   → 设备描述
  * - GET  /scpd/avt.xml | /scpd/rc.xml | /scpd/cm.xml → 服务描述
  * - POST /control/avt|rc|cm → SOAPAction 分发（soapHandler）
- * - SUBSCRIBE /event/avt 等   → 最小事件订阅应答（200 + SID，不主动推送事件）
+ * - SUBSCRIBE /event/avt 等   → GENA 订阅（EventManager 登记 + 初始事件 + LastChange 推送）
  *
  * HTTP/1.1 keep-alive：同一连接循环读请求，直到客户端 close / 超时 / 出错。
  */
@@ -27,6 +27,9 @@ class DlnaHttpServer(
     private val scpdProvider: (kind: String) -> String?,
     private val soapHandler: (path: String, soapAction: String?, body: String) -> Pair<Int, String>,
     private val logger: (String) -> Unit = {},
+    /** GENA 订阅处理（EventManager）：入参 (path, headers)，返回 (SID, 授予秒数)；null 时退回假 SID 应答。 */
+    private val subscribeHandler: ((path: String, headers: Map<String, String>) -> Pair<String, Int>)? = null,
+    private val unsubscribeHandler: ((headers: Map<String, String>) -> Unit)? = null,
 ) {
     private val running = AtomicBoolean(false)
     private var serverSocket: ServerSocket? = null
@@ -184,18 +187,25 @@ class DlnaHttpServer(
     }
 
     private fun serve(req: Request, output: OutputStream, keepAlive: Boolean) {
-        // 最小事件订阅：应答 200 + SID，不主动推送事件（客户端轮询即可工作）
-        if (req.method == "SUBSCRIBE") {
-            val sid = "uuid:${java.util.UUID.randomUUID()}"
+        // GENA 事件订阅：交给 EventManager 登记并推送初始/变更事件；
+        // 未接管理器时退回旧行为（假 SID 只应答不推送）。
+        if (req.method == "SUBSCRIBE" && req.path.startsWith("/event/")) {
+            val (sid, timeoutSec) = subscribeHandler?.invoke(req.path, req.headers)
+                ?: ("uuid:${java.util.UUID.randomUUID()}" to 1800)
             val head = buildString {
                 append("HTTP/1.1 200 OK\r\n")
                 append("SID: $sid\r\n")
-                append("TIMEOUT: Second-1800\r\n")
+                append("TIMEOUT: Second-$timeoutSec\r\n")
                 append("Content-Length: 0\r\n")
                 append(if (keepAlive) "Connection: keep-alive\r\n" else "Connection: close\r\n")
                 append("\r\n")
             }
             output.write(head.toByteArray(StandardCharsets.UTF_8))
+            return
+        }
+        if (req.method == "UNSUBSCRIBE" && req.path.startsWith("/event/")) {
+            runCatching { unsubscribeHandler?.invoke(req.headers) }
+            writeResponse(output, 200, "text/plain", "", keepAlive)
             return
         }
         val result = route(req)

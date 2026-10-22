@@ -56,6 +56,22 @@ object DlnaMediaBridge : DlnaControl {
         appContext = context.applicationContext
     }
 
+    /** AVTransport 状态变更监听（GENA LastChange 推送），由 DlnaServer 注册。 */
+    @Volatile var avtEventListener: ((PlaybackSnapshot) -> Unit)? = null
+
+    /** RenderingControl 音量/静音变更监听（GENA 推送），由 DlnaServer 注册。 */
+    @Volatile var rcEventListener: ((volumePercent: Int, muted: Boolean) -> Unit)? = null
+
+    private fun fireAvtEvent() {
+        val l = avtEventListener ?: return
+        runCatching { l(snapshot()) }
+    }
+
+    private fun fireRcEvent() {
+        val l = rcEventListener ?: return
+        runCatching { l(getVolumePercent(), isMuted()) }
+    }
+
     private val mainHandler = Handler(Looper.getMainLooper())
 
     /**
@@ -90,6 +106,7 @@ object DlnaMediaBridge : DlnaControl {
         } else {
             launchPlayer()
         }
+        fireAvtEvent()
     }
 
     override fun play() {
@@ -104,17 +121,20 @@ object DlnaMediaBridge : DlnaControl {
             state = TransportState.TRANSITIONING
         }
         dispatchToPlayer { it.play() }
+        fireAvtEvent()
     }
 
     override fun pause() {
         if (state == TransportState.PLAYING) state = TransportState.PAUSED_PLAYBACK
         dispatchToPlayer { it.pause() }
+        fireAvtEvent()
     }
 
     override fun stop() {
         state = TransportState.STOPPED
         positionMs = 0
         dispatchToPlayer { it.stopAndFinish() }
+        fireAvtEvent()
     }
 
     override fun seekTo(positionMs: Long) {
@@ -157,6 +177,7 @@ object DlnaMediaBridge : DlnaControl {
             (percent.coerceIn(0, 100) * max / 100).coerceIn(0, max),
             0,
         )
+        fireRcEvent()
     }
 
     override fun getVolumePercent(): Int {
@@ -177,6 +198,7 @@ object DlnaMediaBridge : DlnaControl {
             @Suppress("DEPRECATION")
             am.setStreamMute(AudioManager.STREAM_MUSIC, muted)
         }
+        fireRcEvent()
     }
 
     override fun isMuted(): Boolean {
@@ -207,13 +229,20 @@ object DlnaMediaBridge : DlnaControl {
 
     /** ExoPlayer STATE_BUFFERING：DMR 保持 TRANSITIONING（文档 §3.4.3） */
     fun onPlayerBuffering() {
-        if (state == TransportState.PLAYING) state = TransportState.TRANSITIONING
+        if (state == TransportState.PLAYING) {
+            state = TransportState.TRANSITIONING
+            fireAvtEvent()
+        }
     }
 
     /** ExoPlayer STATE_READY */
     fun onPlayerReady(playing: Boolean, duration: Long) {
         if (duration > 0) durationMs = duration
-        state = if (playing) TransportState.PLAYING else TransportState.PAUSED_PLAYBACK
+        val newState = if (playing) TransportState.PLAYING else TransportState.PAUSED_PLAYBACK
+        if (newState != state) {
+            state = newState
+            fireAvtEvent()
+        }
     }
 
     /** 播放页定时上报（约 500ms） */
@@ -226,11 +255,13 @@ object DlnaMediaBridge : DlnaControl {
     fun onPlayerEnded() {
         state = TransportState.STOPPED
         positionMs = durationMs
+        fireAvtEvent()
     }
 
     fun onPlayerError(msg: String) {
         DlnaLog.w(TAG, "player error: $msg")
         state = TransportState.STOPPED
+        fireAvtEvent()
     }
 
     // ---------- 播放页拉起 ----------
