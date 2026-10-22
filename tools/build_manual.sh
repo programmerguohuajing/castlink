@@ -43,8 +43,8 @@ APP_CP="$AJAR:$STDLIB:$ZXING:$COROUTINES_CORE:$COROUTINES_ANDROID:$BCPROV:$DDPLI
 
 PROJ=~/workspace/castlink
 OUT=$PROJ/build/manual
-VERSION_NAME="0.1.45"
-VERSION_CODE=66
+VERSION_NAME="0.1.46"
+VERSION_CODE=67
 APK_NAME="CastLink-v${VERSION_NAME}.apk"
 rm -rf "$OUT"
 mkdir -p "$OUT/gen" "$OUT/classes" "$OUT/dex"
@@ -99,6 +99,12 @@ python3 -c "
 import zipfile, os, glob
 with zipfile.ZipFile('$OUT/app-debug-unsigned.apk', 'a', zipfile.ZIP_DEFLATED) as z:
     z.write('$OUT/dex/classes.dex', 'classes.dex')
+    # v0.1.46：Media3+Guava 加入后方法数超单 dex 64K 上限，d8 会溢出拆出
+    # classes2.dex/classes3.dex。只打包 classes.dex 会静默丢类（v0.1.41 起
+    # BouncyCastle crypto/params 等被丢，iOS AirPlay 握手 NoClassDefFoundError）。
+    for extra_dex in sorted(glob.glob('$OUT/dex/classes[0-9]*.dex')):
+        z.write(extra_dex, os.path.basename(extra_dex))
+        print('added %s' % os.path.basename(extra_dex))
     for so in sorted(glob.glob('$PROJ/app/src/main/jniLibs/*/*.so')):
         abi = os.path.basename(os.path.dirname(so))
         # v0.3.7：.so 必须不压缩存储（ZIP_STORED）。压缩存储时部分 TV 盒子的包管理器
