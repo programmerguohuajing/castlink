@@ -143,7 +143,9 @@ class SettingsActivity : BaseActivity() {
     private lateinit var dpadFocusList: List<View>
 
     private fun setupManualDpad() {
-        dpadFocusList = listOfNotNull(
+        // 显式 <View>：否则元素类型会被下面的 RadioButton 元素带偏推断成 RadioButton，
+        // 无类型的 findViewById（如 ImageButton 的返回键）存入数组时抛 ArrayStoreException
+        dpadFocusList = listOfNotNull<View>(
             findViewById(R.id.btn_settings_back),
             findViewById(R.id.et_device_name),
             findViewById(R.id.btn_save_device_name),
