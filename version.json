@@ -1,1 +1,1 @@
-{"_comment":"CastLink OTA","apkUrl":"https://github.com/programmerguohuajing/castlink/releases/download/v0.1.49/CastLink-v0.1.49.apk","changelog":"v0.1.49\n- 修复 DLNA 投屏卡「连接中」+ 电视循环重播开头：补齐 GENA 事件推送（订阅初始事件 + 播放状态 LastChange 实时通知）","versionCode":70,"versionName":"0.1.49"}
+{"_comment":"CastLink OTA","apkUrl":"https://github.com/programmerguohuajing/castlink/releases/download/v0.1.50/CastLink-v0.1.50.apk","changelog":"v0.1.50\n- 修复 iOS 隔空播放视频播几帧后卡住：镜像流大关键帧跨包重组（按长度拼出完整 NAL 再喂解码器）","versionCode":71,"versionName":"0.1.50"}
