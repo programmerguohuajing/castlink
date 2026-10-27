@@ -77,6 +77,24 @@ class MirrorStreamServer(
     // Set by the reader thread when a frame is dropped under load; the decoder thread then skips
     // frames until the next keyframe (IDR) so it never decodes a reference-broken, corrupt stream.
     @Volatile private var awaitingKeyframe = false
+    // Type-5 diagnostic (v0.1.51): type-5 payloads are ignored today (same as the reference
+    // 0/1-only handling), but their size jumps to a constant ~25 KB exactly when output
+    // freezes — log the raw head of the first few per session so the next test can tell
+    // whether they are keyframes the receiver is throwing away. Raw bytes only, no cipher
+    // touch: type-5 is not in the video cipher stream (video rendered past early type-5s),
+    // so reading it cannot desync decryption.
+    private var type5Logged = 0
+    // 输出卡死看门狗（reader 线程置位、decoder 线程执行）：解码器一旦进入“吃输入不
+    // 出帧”的 wedged 状态（实测 in=600 out=101，队列/Surface 均正常，无报错无丢帧），
+    // 换播也救不回来；此时重建解码器并在下一个 IDR 处重同步，把永久冻帧降级为一次
+    // 短暂闪断。5s 冷却避免码流本身不可解时反复重建刷屏。
+    @Volatile private var stallRecreateRequested = false
+    @Volatile private var lastStallRequestMs = 0L
+    private var lastStatsOut = -1L
+    // 统计区间内喂给解码线程的 IDR / 带内 SPS 数量（decoder 线程写、reader 线程读）
+    // ——下次冻帧时直接区分“手机没发关键帧”与“解码器 wedged”。
+    @Volatile private var idrFed = 0
+    @Volatile private var spsFed = 0
 
     /** The OS-assigned TCP port macOS should connect to (returned in the SETUP response). */
     val dataPort: Int get() = serverSocket.localPort
@@ -122,7 +140,15 @@ class MirrorStreamServer(
                         if (annexB.isNotEmpty()) enqueue(Frame(annexB))
                     }
                     1 -> parseConfig(payload)?.let { enqueue(it) }
-                    else -> Logger.v("Mirror: ignoring payload type $payloadType ($payloadSize B)")
+                    else -> {
+                        if (payloadType == 5 && type5Logged < 3) {
+                            type5Logged++
+                            val head = payload.take(8).joinToString(" ") { "%02x".format(it) }
+                            Logger.i("Mirror: type 5 payload #$type5Logged head=[$head] size=$payloadSize")
+                        } else {
+                            Logger.v("Mirror: ignoring payload type $payloadType ($payloadSize B)")
+                        }
+                    }
                 }
             }
         } catch (e: Exception) {
@@ -156,9 +182,21 @@ class MirrorStreamServer(
             // out 冻结时先看 surf：若 surface 已死（例如用户切到了日志页），out 不涨是
             // 预期行为而非解码器故障。
             val surf = if (surfaceProvider() != null) "ok" else "lost"
+            // 看门狗：out 在整整一个统计区间（300 帧）里纹丝不动 = 真卡死，请求
+            // decoder 线程重建（冷却期内只请求一次）。
+            if (out >= 0 && out < framesIn - 120 && out == lastStatsOut &&
+                System.currentTimeMillis() - lastStallRequestMs > STALL_RECREATE_COOLDOWN_MS) {
+                stallRecreateRequested = true
+                lastStallRequestMs = System.currentTimeMillis()
+                Logger.w("Mirror: output stall (in=$framesIn out=$out, unchanged) — requesting decoder recreate")
+            }
+            lastStatsOut = out
             Logger.i("Video stats: in=$framesIn out=$out dropped=$framesDropped " +
                 "(${StreamStats.videoDropPct}%) queue=${queue.size}/$QUEUE_CAPACITY " +
-                "${StreamStats.videoFps}fps nal=$reassembledNals pend=${pendingAvcc.size()}B surf=$surf$stall")
+                "${StreamStats.videoFps}fps nal=$reassembledNals pend=${pendingAvcc.size()}B surf=$surf " +
+                "idr=$idrFed sps=$spsFed$stall")
+            idrFed = 0
+            spsFed = 0
         }
     }
 
@@ -220,6 +258,12 @@ class MirrorStreamServer(
     private fun runDecoder() {
         try {
             while (running) {
+                if (stallResetRequested) {
+                    stallResetRequested = false
+                    queue.clear()
+                    rebuildDecoder(surfaceProvider())
+                    Logger.i("Mirror: decoder reset after output stall (awaiting keyframe)")
+                }
                 val item = queue.poll(200, TimeUnit.MILLISECONDS) ?: continue
                 when (item) {
                     is Config -> configureDecoder(item.sps, item.pps)
@@ -273,6 +317,32 @@ class MirrorStreamServer(
             Logger.i("Mirror: surface ${if (liveSurface == null) "lost" else "changed"} — re-attaching decoder")
             rebuildDecoder(liveSurface)
         }
+        // 看门狗：输出卡死时重建解码器（见字段注释；decoder 线程执行）。
+        if (stallRecreateRequested) {
+            stallRecreateRequested = false
+            Logger.i("Mirror: recreating decoder after output stall " +
+                "(in=$framesIn out=${decoder?.framesOut})")
+            rebuildDecoder(liveSurface)
+        }
+        // NAL 普查：记 IDR / 带内 SPS，并检测带内 SPS 变化。换播或旋转导致编码参数
+        // 变化时，手机可能只在流内发新 SPS 而不发 type-1 配置；旧解码器按旧参数解新流
+        // 会静默不出帧——此时用新 SPS/PPS 重建才是正解。SPS 相同是常态，不触发。
+        // 普查只是诊断，绝不能抛异常杀死解码线程。
+        runCatching {
+            val census = censusNals(annexB)
+            if (census.idr > 0) idrFed += census.idr
+            val newSps = census.sps
+            if (newSps != null && newSps.isNotEmpty()) {
+                spsFed++
+                val cur = decoder
+                if (cur != null && lastSps != null && !newSps.contentEquals(lastSps)) {
+                    Logger.i("Mirror: in-band SPS changed (${lastSps!!.size}B -> ${newSps.size}B) — rebuilding decoder")
+                    lastSps = newSps
+                    if (census.pps != null) lastPps = census.pps
+                    rebuildDecoder(liveSurface)
+                }
+            }
+        }
         val d = decoder ?: return                              // need surface + SPS/PPS first
         if (!d.isHealthy) {                                    // error state — drop, await next config
             Logger.w("Mirror: decoder unhealthy — dropping, awaiting new SPS/PPS")
@@ -289,6 +359,52 @@ class MirrorStreamServer(
         if (framePtsUs == 0L) Logger.i("Mirror: first video frame fed to decoder (${annexB.size}B)")
         d.decodeNalUnit(annexB, framePtsUs)
         framePtsUs += FRAME_INTERVAL_US
+    }
+
+    /** 单次扫描 Annex-B 块的结果：IDR 数量、首个 SPS 与首个 PPS 的原始字节。 */
+    private class NalCensus(val idr: Int, val sps: ByteArray?, val pps: ByteArray?)
+
+    /**
+     * 单次扫描 Annex-B 块，统计 IDR 数量并提取首个 SPS/PPS。起始码按 00 00 01 识别
+     * （4 字节码的后 3 字节同样命中，类型字节位置不变）；提取的 SPS/PPS 会去掉尾部
+     * 0x00——4 字节起始码的首字节会被算进上一个 NAL 的尾巴，RBSP 尾部停比特保证
+     * 真实 NAL 末字节恒非零，所以尾部 0x00 只可能是起始码前缀或 cabac 填充，去掉
+     * 后比较才不会把同一个 SPS 误判为“变化”。
+     */
+    private fun censusNals(annexB: ByteArray): NalCensus {
+        var idr = 0
+        var sps: ByteArray? = null
+        var pps: ByteArray? = null
+        var curHeader = -1
+        var curType = -1
+        fun flush(end: Int) {
+            if (curHeader < 0 || end <= curHeader) return
+            when (curType) {
+                5 -> idr++
+                7 -> if (sps == null) sps = trimTrailingZeros(annexB.copyOfRange(curHeader, end))
+                8 -> if (pps == null) pps = trimTrailingZeros(annexB.copyOfRange(curHeader, end))
+            }
+        }
+        var i = 0
+        while (i + 2 < annexB.size) {
+            if (annexB[i].toInt() == 0 && annexB[i + 1].toInt() == 0 && annexB[i + 2].toInt() == 1) {
+                flush(i)
+                val header = i + 3
+                curHeader = header
+                curType = if (header < annexB.size) annexB[header].toInt() and 0x1F else -1
+                i = header
+            } else {
+                i++
+            }
+        }
+        flush(annexB.size)
+        return NalCensus(idr, sps, pps)
+    }
+
+    private fun trimTrailingZeros(data: ByteArray): ByteArray {
+        var end = data.size
+        while (end > 0 && data[end - 1].toInt() == 0) end--
+        return if (end == data.size) data else data.copyOf(end)
     }
 
     /** True if the Annex-B frame contains an IDR NAL unit (type 5) — a decodable resync point. */
@@ -336,6 +452,7 @@ class MirrorStreamServer(
         private const val MAX_PAYLOAD = 8 * 1024 * 1024        // 8 MB sanity cap per frame
         private const val FRAME_INTERVAL_US = 1_000_000L / 60  // monotonic PTS hint (~60fps)
         private const val QUEUE_CAPACITY = 90                  // ~1.5s @60fps before dropping
+        private const val STALL_RECREATE_COOLDOWN_MS = 5000L   // 看门狗重建冷却（见字段注释）
         private const val SURFACE_WAIT_TRIES = 50
         private const val SURFACE_WAIT_MS = 100L
     }
