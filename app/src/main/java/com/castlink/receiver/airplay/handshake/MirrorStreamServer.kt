@@ -24,7 +24,8 @@ import java.util.concurrent.TimeUnit
  *  - payload_size = little-endian int at header offset 0
  *  - payload_type = little-endian short at header offset 4, low byte
  *      • type 1: unencrypted avcC (SPS/PPS) → (re)configure the decoder
- *      • type 0: AES-CTR-encrypted H.264 (AVCC) → decrypt, convert to Annex-B, decode
+ *      • type 0: AES-CTR-encrypted H.264 (AVCC) → decrypt, reassemble complete NAL
+ *        units (a NAL may span packets), convert to Annex-B, decode
  *
  * Architecture: a network thread reads + decrypts packets (keeping the AES-CTR keystream strictly
  * ordered) and pushes work onto a bounded queue; a separate decoder thread consumes it. This way
@@ -47,6 +48,15 @@ class MirrorStreamServer(
     private class Frame(val annexB: ByteArray) : Item()
 
     private val cipher = MirrorCrypto.streamCipher(aesKey, ecdhSecret, streamConnectionId)
+    // AVCC 重组缓冲（仅 reader 线程使用）：一个 NAL 单元可能被拆到多个 type-0 包里
+    // （1080p 关键帧常超单包）。旧代码按包直转 Annex-B：前半包因长度不够整包丢弃，
+    // 后半包把续传数据当长度读也是垃圾 → 关键帧永远到不了，之后 P 帧缺参考帧被
+    // 解码器静默丢弃（实测 in=300 out=10 后永久卡住）。这里先攒解密字节、按长度
+    // 字段拼出完整 NAL 再入队；不完整的一律留待后续包补齐。
+    private val pendingAvcc = java.io.ByteArrayOutputStream()
+    // avcC 记录 byte 4 低 2 位 = lengthSizeMinusOne（iOS 固定 4；无配置前默认 4）
+    private var nalLengthSize = 4
+    private var reassembledNals = 0
     // OS-assigned free port, explicit IPv4 wildcard — see RtspHandler.bindRtspSocket() for why.
     private val serverSocket = ServerSocket(0, 50, java.net.InetAddress.getByName("0.0.0.0"))
     private val queue = ArrayBlockingQueue<Item>(QUEUE_CAPACITY)
@@ -107,7 +117,8 @@ class MirrorStreamServer(
                     0 -> {
                         // ALWAYS advance the AES-CTR keystream, in order, for every video payload —
                         // skipping any packet desyncs the keystream and corrupts all later frames.
-                        val annexB = MirrorCrypto.avccToAnnexB(cipher.update(payload))
+                        // 解密后不直接转 Annex-B：先经重组缓冲拼出完整 NAL（见 pendingAvcc 注释）。
+                        val annexB = extractCompleteNals(cipher.update(payload))
                         if (annexB.isNotEmpty()) enqueue(Frame(annexB))
                     }
                     1 -> parseConfig(payload)?.let { enqueue(it) }
@@ -141,12 +152,60 @@ class MirrorStreamServer(
             // 环节卡死（画面冻住但网络日志一切正常），这是定位显示类冻帧的关键判据。
             val out = decoder?.framesOut ?: -1L
             val stall = if (out >= 0 && out < framesIn - 120) " NO-OUTPUT-STALL" else ""
+            // pend= 重组缓冲残留（拆包 NAL 暂存）；surf= 当前 Surface 是否存活——
+            // out 冻结时先看 surf：若 surface 已死（例如用户切到了日志页），out 不涨是
+            // 预期行为而非解码器故障。
+            val surf = if (surfaceProvider() != null) "ok" else "lost"
             Logger.i("Video stats: in=$framesIn out=$out dropped=$framesDropped " +
-                "(${StreamStats.videoDropPct}%) queue=${queue.size}/$QUEUE_CAPACITY ${StreamStats.videoFps}fps$stall")
+                "(${StreamStats.videoDropPct}%) queue=${queue.size}/$QUEUE_CAPACITY " +
+                "${StreamStats.videoFps}fps nal=$reassembledNals pend=${pendingAvcc.size()}B surf=$surf$stall")
         }
     }
 
+    /**
+     * 从解密 AVCC 字节流中提取全部完整 NAL（转 Annex-B）。不完整的尾巴留在
+     * [pendingAvcc] 里等后续包补齐；长度字段损坏时清缓冲并等下一个关键帧重同步，
+     * 避免一次损坏永久卡住重组。
+     */
+    private fun extractCompleteNals(decrypted: ByteArray): ByteArray {
+        pendingAvcc.write(decrypted)
+        val buf = pendingAvcc.toByteArray()
+        val out = java.io.ByteArrayOutputStream()
+        val ls = nalLengthSize
+        var i = 0
+        while (i + ls <= buf.size) {
+            var len = 0
+            for (k in 0 until ls) len = (len shl 8) or (buf[i + k].toInt() and 0xFF)
+            if (len <= 0 || len > MAX_PAYLOAD) {
+                Logger.w("Mirror: bad NAL length $len (lenSize=$ls) — dropping ${buf.size}B " +
+                    "pending, awaiting keyframe")
+                pendingAvcc.reset()
+                awaitingKeyframe = true
+                return out.toByteArray()
+            }
+            if (i + ls + len > buf.size) break // NAL 被拆包：等后续包补齐
+            out.write(MirrorCrypto.START_CODE)
+            out.write(buf, i + ls, len)
+            reassembledNals++
+            i += ls + len
+        }
+        pendingAvcc.reset()
+        if (i < buf.size) pendingAvcc.write(buf, i, buf.size - i)
+        if (pendingAvcc.size() > MAX_PAYLOAD) {
+            Logger.w("Mirror: pending NAL never completed (${pendingAvcc.size()}B) — dropping, " +
+                "awaiting keyframe")
+            pendingAvcc.reset()
+            awaitingKeyframe = true
+        }
+        return out.toByteArray()
+    }
+
     private fun parseConfig(payload: ByteArray): Config? = try {
+        // avcC byte 4 低 2 位 = NAL 长度字段字节数 - 1（标准 4；异常值时保持默认 4）
+        val lsFromConfig = (payload[4].toInt() and 0x03) + 1
+        if (lsFromConfig == 1 || lsFromConfig == 2 || lsFromConfig == 4) {
+            nalLengthSize = lsFromConfig
+        }
         val spsSize = ((payload[6].toInt() and 0xFF) shl 8) or (payload[7].toInt() and 0xFF)
         val sps = payload.copyOfRange(8, 8 + spsSize)
         val ppsLenOffset = 8 + spsSize + 1                   // skip the 1-byte PPS count
