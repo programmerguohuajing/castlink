@@ -1,1 +1,1 @@
-{"_comment":"CastLink OTA","apkUrl":"https://github.com/programmerguohuajing/castlink/releases/download/v0.1.54/CastLink-v0.1.54.apk","changelog":"v0.1.54\n- 回退整包喂帧；软解兜底保留；新增前 3 个包 NAL 构成日志","versionCode":75,"versionName":"0.1.54"}
+{"_comment":"CastLink OTA","apkUrl":"https://github.com/programmerguohuajing/castlink/releases/download/v0.1.55/CastLink-v0.1.55.apk","changelog":"v0.1.55\n- 直接修复解码器配置：csd 改裸 NAL；IDR 前补带内 SPS/PPS；首个 IDR 头字节日志","versionCode":76,"versionName":"0.1.55"}
