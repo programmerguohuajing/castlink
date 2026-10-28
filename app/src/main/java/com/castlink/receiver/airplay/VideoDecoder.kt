@@ -5,6 +5,7 @@
 package com.castlink.receiver.airplay
 
 import android.media.MediaCodec
+import android.media.MediaCodecList
 import android.media.MediaFormat
 import android.view.Surface
 import com.castlink.receiver.airplay.util.Logger
@@ -32,7 +33,13 @@ import com.castlink.receiver.airplay.util.Logger
  *   decoder.decodeNalUnit(nalUnitBytes)                    // call for each video chunk
  *   decoder.release()                                       // call when done
  */
-class VideoDecoder(private val outputSurface: Surface, private val codec: com.castlink.receiver.airplay.VideoCodec = com.castlink.receiver.airplay.VideoCodec.H264) {
+class VideoDecoder(
+    private val outputSurface: Surface,
+    private val codec: com.castlink.receiver.airplay.VideoCodec = com.castlink.receiver.airplay.VideoCodec.H264,
+    // 软解兜底：某些 TV SoC 的硬解对特定码流会无报错卡死；硬解两次重建无果后
+    // 镜像服务会置位改走软解（1080p 软解可能掉帧，但能播）。
+    private val preferSoftware: Boolean = false,
+) {
 
     // The underlying hardware decoder — null until initialize() is called
     private var mediaCodec: MediaCodec? = null
@@ -129,10 +136,9 @@ class VideoDecoder(private val outputSurface: Surface, private val codec: com.ca
             setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, 2 * 1024 * 1024)
         }
 
-        // Create the hardware H.264 decoder.
-        // "video/avc" is the MIME type for H.264. Android will pick the best
-        // available hardware decoder for this format.
-        mediaCodec = MediaCodec.createDecoderByType(if (codec == com.castlink.receiver.airplay.VideoCodec.HEVC) MediaFormat.MIMETYPE_VIDEO_HEVC else MediaFormat.MIMETYPE_VIDEO_AVC)
+        // Create the decoder (hardware by default; software when preferSoftware is set).
+        val mime = if (codec == com.castlink.receiver.airplay.VideoCodec.HEVC) MediaFormat.MIMETYPE_VIDEO_HEVC else MediaFormat.MIMETYPE_VIDEO_AVC
+        mediaCodec = createDecoder(mime)
 
         // Configure the decoder:
         // - format: what the input will look like (H.264, width, height, SPS/PPS)
@@ -144,6 +150,37 @@ class VideoDecoder(private val outputSurface: Surface, private val codec: com.ca
 
         _isInitialized = true
         Logger.i("H.264 decoder initialized successfully")
+    }
+
+    /** 建解码器：preferSoftware 时优先找系统软解（c2.android / OMX.google），找不到回落硬解。 */
+    private fun createDecoder(mime: String): MediaCodec {
+        if (preferSoftware) {
+            // 先精确命中同 mime 最常见的软解，再遍历兜底；建失败就换下一个，全部失败回落硬解。
+            val candidates = ArrayList<String>()
+            candidates.add(if (mime == MediaFormat.MIMETYPE_VIDEO_HEVC) "c2.android.hevc.decoder" else "c2.android.avc.decoder")
+            try {
+                val list = MediaCodecList(MediaCodecList.ALL_CODECS)
+                for (info in list.codecInfos) {
+                    if (info.isEncoder) continue
+                    if (!info.supportedTypes.contains(mime)) continue
+                    val name = info.name
+                    if ((name.startsWith("c2.android.") || name.startsWith("OMX.google.")) &&
+                        !candidates.contains(name)) candidates.add(name)
+                }
+            } catch (e: Exception) {
+                Logger.w("VideoDecoder: MediaCodecList query failed", e)
+            }
+            for (name in candidates) {
+                try {
+                    Logger.i("VideoDecoder: trying software decoder $name")
+                    return MediaCodec.createByCodecName(name)
+                } catch (e: Exception) {
+                    Logger.w("VideoDecoder: software decoder $name unavailable, trying next")
+                }
+            }
+            Logger.w("VideoDecoder: no software decoder usable — falling back to hardware")
+        }
+        return MediaCodec.createDecoderByType(mime)
     }
 
     /**
@@ -180,44 +217,32 @@ class VideoDecoder(private val outputSurface: Surface, private val codec: com.ca
             // frames) and causes a black screen until the next keyframe, so we avoid it.
             releaseOutputBuffers(codec)
 
-            // Wait for an input buffer. Longer than before: on a modest SoC the decoder can
-            // briefly fall behind, and waiting beats dropping (which corrupts the stream).
-            val inputBufferIndex = codec.dequeueInputBuffer(INPUT_BUFFER_TIMEOUT_US)
-
-            if (inputBufferIndex >= 0) {
-                // We got an input buffer — fill it with the NAL unit bytes
-                val inputBuffer = codec.getInputBuffer(inputBufferIndex)!!
-                if (nalUnit.size > inputBuffer.capacity()) {
-                    // 超过输入缓冲容量时 put() 会抛 BufferOverflowException 被泛捕获，
-                    // 日志看不出真因；这里显式记录并丢弃，调用方据返回值重同步。
-                    Logger.e("VideoDecoder: NAL ${nalUnit.size}B exceeds input buffer " +
-                        "${inputBuffer.capacity()}B — dropping")
-                    return false
-                }
-                inputBuffer.clear()
-                inputBuffer.put(nalUnit)
-
-                // Tell MediaCodec: "input buffer [index] is filled with [size] bytes
-                // of data with timestamp [presentationTimeUs] — please decode it"
-                codec.queueInputBuffer(
-                    inputBufferIndex,
-                    0,                 // offset: start from beginning of buffer
-                    nalUnit.size,      // size: how many bytes to decode
-                    presentationTimeUs,
-                    0                  // flags: 0 = normal frame (not end-of-stream)
-                )
+            // Annex-B 输入按起始码拆成单个 NAL、每 NAL 单独一个 input buffer。
+            // 镜像重组会把多个 NAL（含跨包拼出的前一画面尾巴 + 后一画面）打进同
+            // 一个 buffer，挑剔的电视 SoC 解码器可能因此乱掉参考状态、无报错卡
+            // 死（实测 in 涨 out 不涨、全计数器绿）。单 NAL 一 buffer 是最标准
+            // 的喂法；SEI/AUD/filler 按定义可安全跳过（不影响参考链）。
+            // 无起始码的输入（如旧 RTSP 路径的裸 NAL）回退为整包直喂，保持旧行为。
+            val nals = splitAnnexB(nalUnit)
+            val fed = if (nals.isEmpty()) {
+                queueOneNal(codec, nalUnit, presentationTimeUs)
             } else {
-                // No input buffer available — the decoder is catching up.
-                // Drop this NAL unit to avoid building up backlog (prefer low latency).
-                Logger.v("VideoDecoder: no input buffer available, dropping NAL unit")
-                releaseOutputBuffers(codec)
-                return false
+                var ok = true
+                for ((header, end) in nals) {
+                    val type = nalUnit[header].toInt() and 0x1F
+                    if (type == 6 || type == 9 || type == 12) continue // SEI / AUD / filler
+                    val buf = ByteArray(4 + (end - header))
+                    buf[0] = 0; buf[1] = 0; buf[2] = 0; buf[3] = 1
+                    nalUnit.copyInto(buf, 4, header, end)
+                    if (!queueOneNal(codec, buf, presentationTimeUs)) { ok = false; break }
+                }
+                ok
             }
 
             // Release any output buffers that MediaCodec has finished decoding.
             // render=true means the frame goes to the Surface immediately.
             releaseOutputBuffers(codec)
-            return true
+            return fed
 
         } catch (e: IllegalStateException) {
             // MediaCodec is now in the error state and cannot recover — flag for recreation.
@@ -228,6 +253,64 @@ class VideoDecoder(private val outputSurface: Surface, private val codec: com.ca
             Logger.e("Error decoding NAL unit", e)
             return false
         }
+    }
+
+    /** 把一个 NAL（带起始码）喂给解码器；返回 false 表示丢帧（超限/超时）。 */
+    private fun queueOneNal(codec: MediaCodec, nal: ByteArray, presentationTimeUs: Long): Boolean {
+        // Wait for an input buffer. Longer than before: on a modest SoC the decoder can
+        // briefly fall behind, and waiting beats dropping (which corrupts the stream).
+        val inputBufferIndex = codec.dequeueInputBuffer(INPUT_BUFFER_TIMEOUT_US)
+        if (inputBufferIndex < 0) {
+            // No input buffer available — the decoder is catching up.
+            // Drop this NAL unit to avoid building up backlog (prefer low latency).
+            Logger.v("VideoDecoder: no input buffer available, dropping NAL unit")
+            return false
+        }
+        // We got an input buffer — fill it with the NAL unit bytes
+        val inputBuffer = codec.getInputBuffer(inputBufferIndex)!!
+        if (nal.size > inputBuffer.capacity()) {
+            // 超过输入缓冲容量时 put() 会抛 BufferOverflowException 被泛捕获，
+            // 日志看不出真因；这里显式记录并丢弃，调用方据返回值重同步。
+            Logger.e("VideoDecoder: NAL ${nal.size}B exceeds input buffer " +
+                "${inputBuffer.capacity()}B — dropping")
+            return false
+        }
+        inputBuffer.clear()
+        inputBuffer.put(nal)
+
+        // Tell MediaCodec: "input buffer [index] is filled with [size] bytes
+        // of data with timestamp [presentationTimeUs] — please decode it"
+        codec.queueInputBuffer(
+            inputBufferIndex,
+            0,                 // offset: start from beginning of buffer
+            nal.size,          // size: how many bytes to decode
+            presentationTimeUs,
+            0                  // flags: 0 = normal frame (not end-of-stream)
+        )
+        return true
+    }
+
+    /**
+     * 把 Annex-B 块按起始码拆成 NAL 范围列表，每项为 (headerPos, end)：headerPos
+     * 是 NAL 头字节位置，end 是下一个起始码的起始位置（4 字节码的首个 0 会被算进
+     * 上一个 NAL 的尾巴——那只是合法的前导零，不影响解码）。无起始码时返回空表。
+     */
+    private fun splitAnnexB(data: ByteArray): List<Pair<Int, Int>> {
+        val out = ArrayList<Pair<Int, Int>>()
+        var curHeader = -1
+        var i = 0
+        while (i + 2 < data.size) {
+            if (data[i].toInt() == 0 && data[i + 1].toInt() == 0 && data[i + 2].toInt() == 1) {
+                if (curHeader >= 0) out.add(Pair(curHeader, i))
+                val header = i + 3
+                curHeader = if (header < data.size) header else -1
+                i = header
+            } else {
+                i++
+            }
+        }
+        if (curHeader >= 0) out.add(Pair(curHeader, data.size))
+        return out
     }
 
     /**

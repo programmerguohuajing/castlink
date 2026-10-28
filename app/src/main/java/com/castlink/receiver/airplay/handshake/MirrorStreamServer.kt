@@ -95,6 +95,12 @@ class MirrorStreamServer(
     private var lastOutAdvanceMs = 0L
     private var lastWatchdogRecreateMs = 0L
     private var lastPeriodicStatMs = 0L
+    // 软解兜底：硬解看门狗重建两次仍无输出（且本会话手机不发 IDR，见 idr=0），
+    // 说明问题可能在硬解本身，改走系统软解再试；软解初始化失败则回落硬解。
+    private var useSoftwareDecoder = false
+    private var watchdogRebuildCount = 0
+    // 本会话累计 IDR 数（不清零）：看门狗触发时据此判断“手机到底发没发过关键帧”。
+    private var idrTotal = 0
     // 解码器侧丢帧数（输入缓冲超限/超时/异常），与队列丢帧 framesDropped 区分打印。
     @Volatile private var decoderDropped = 0
     // 统计区间内喂给解码线程的 IDR / 带内 SPS 数量（decoder 线程写、reader 线程读）
@@ -194,16 +200,35 @@ class MirrorStreamServer(
      * 避免“没有 in=600 行”被误读为流停了。
      */
     private fun checkStallWatchdog() {
-        val d = decoder ?: return
-        val out = d.framesOut
         val now = System.currentTimeMillis()
+        val d = decoder
+        if (d == null) {
+            // 解码器为空（初始化失败或 Surface 丢失后）：有配置 + Surface 时定期重试
+            // 重建，否则一次初始化失败就永久黑屏。
+            if (lastSps != null && surfaceProvider() != null &&
+                now - lastWatchdogRecreateMs > STALL_RECREATE_COOLDOWN_MS) {
+                lastWatchdogRecreateMs = now
+                Logger.i("Mirror: decoder missing — retrying rebuild")
+                rebuildDecoder(surfaceProvider())
+            }
+            return
+        }
+        val out = d.framesOut
         if (out != lastWatchdogOut) {
             lastWatchdogOut = out
             lastOutAdvanceMs = now
         } else if (framesIn - out > STALL_GAP_FRAMES && now - lastOutAdvanceMs > STALL_QUIET_MS &&
             now - lastWatchdogRecreateMs > STALL_RECREATE_COOLDOWN_MS) {
             lastWatchdogRecreateMs = now
-            Logger.w("Mirror: output stall (in=$framesIn out=$out, quiet ${now - lastOutAdvanceMs}ms) — recreating decoder")
+            watchdogRebuildCount++
+            if (watchdogRebuildCount >= 2 && !useSoftwareDecoder) {
+                // 硬解已两次重建无果：换软解再试（软解初始化失败时 rebuildDecoder
+                // 会自动回落硬解）。
+                useSoftwareDecoder = true
+                Logger.w("Mirror: output stall (in=$framesIn out=$out, sessionIdr=$idrTotal) — hardware decoder stalled twice, switching to software AVC decoder")
+            } else {
+                Logger.w("Mirror: output stall (in=$framesIn out=$out, quiet ${now - lastOutAdvanceMs}ms, sessionIdr=$idrTotal) — recreating decoder")
+            }
             rebuildDecoder(surfaceProvider())
         }
         if (lastPeriodicStatMs == 0L) lastPeriodicStatMs = now
@@ -333,7 +358,19 @@ class MirrorStreamServer(
         val pps = lastPps ?: return
         if (surface == null) return                            // backgrounded — wait for the surface to return
         val sc = MirrorCrypto.START_CODE
-        decoder = VideoDecoder(surface).also { it.initialize(sc + sps, sc + pps, width, height) }
+        try {
+            decoder = VideoDecoder(surface, preferSoftware = useSoftwareDecoder).also { it.initialize(sc + sps, sc + pps, width, height) }
+        } catch (e: Exception) {
+            // 初始化失败（例如软解不支持该格式）绝不能杀死解码线程：保持 decoder=null，
+            // 看门狗的空闲重建会定期重试；软解失败时下次重试回落硬解。
+            Logger.e("Mirror: decoder initialize failed — will retry", e)
+            if (useSoftwareDecoder) {
+                useSoftwareDecoder = false
+                Logger.w("Mirror: software decoder init failed — falling back to hardware on retry")
+            }
+            decoder = null
+            return
+        }
         awaitingKeyframe = true                                // a fresh decoder must start at an IDR
         StreamStats.videoRes = "${width}x${height}"
         Logger.i("Mirror decoder (re)built for surface (sps=${sps.size}B pps=${pps.size}B)")
@@ -353,7 +390,7 @@ class MirrorStreamServer(
         // 普查只是诊断，绝不能抛异常杀死解码线程。
         runCatching {
             val census = censusNals(annexB)
-            if (census.idr > 0) idrFed += census.idr
+            if (census.idr > 0) { idrFed += census.idr; idrTotal += census.idr }
             val newSps = census.sps
             if (newSps != null && newSps.isNotEmpty()) {
                 spsFed++
