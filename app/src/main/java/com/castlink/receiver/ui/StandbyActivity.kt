@@ -335,7 +335,8 @@ class StandbyActivity : BaseActivity() {
         AirPlayUiBridge.photoListener = { bytes -> onAirPlayPhoto(bytes) }
 
         // v0.3.10：待机页直接提供 AirPlay 镜像 surface——sv_airplay_video 平时
-        // invisible（surface 保留），有视频流时切 visible 全屏显示。
+        // invisible（此时 SurfaceView 会销毁 Surface，见 surfaceDestroyed 回调），
+        // 有视频流时切 visible 全屏显示，surfaceCreated 后解码端重新挂接。
         airplaySurfaceView = findViewById(R.id.sv_airplay_video)
         airplayPhotoView = findViewById(R.id.iv_airplay_photo)
         airplaySurfaceView.holder.addCallback(object : SurfaceHolder.Callback {

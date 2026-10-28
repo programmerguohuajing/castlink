@@ -71,7 +71,8 @@ class MirrorStreamServer(
     // and rebuild the decoder — otherwise video stays black after foregrounding.
     @Volatile private var configuredSurface: Surface? = null
     private var framePtsUs = 0L
-    private var framesIn = 0
+    // reader 线程写、decoder 线程的看门狗读——@Volatile 保证可见性（单写者，无竞态）。
+    @Volatile private var framesIn = 0
     private var framesDropped = 0
     private var lastStatMs = 0L
     // Set by the reader thread when a frame is dropped under load; the decoder thread then skips
@@ -84,13 +85,18 @@ class MirrorStreamServer(
     // touch: type-5 is not in the video cipher stream (video rendered past early type-5s),
     // so reading it cannot desync decryption.
     private var type5Logged = 0
-    // 输出卡死看门狗（reader 线程置位、decoder 线程执行）：解码器一旦进入“吃输入不
-    // 出帧”的 wedged 状态（实测 in=600 out=101，队列/Surface 均正常，无报错无丢帧），
-    // 换播也救不回来；此时重建解码器并在下一个 IDR 处重同步，把永久冻帧降级为一次
-    // 短暂闪断。5s 冷却避免码流本身不可解时反复重建刷屏。
-    @Volatile private var stallRecreateRequested = false
-    @Volatile private var lastStallRequestMs = 0L
-    private var lastStatsOut = -1L
+    // 输出卡死看门狗（decoder 线程，时间驱动，见 checkStallWatchdog）：解码器一旦
+    // 进入“吃输入不出帧”的 wedged 状态（实测 in=600 out=101，队列/Surface 均正常，
+    // 无报错无丢帧），换播也救不回来；此时重建解码器并在下一个 IDR 处重同步，把
+    // 永久冻帧降级为一次短暂闪断。时间驱动而非帧数驱动——静态画面发帧少时，300 帧
+    // 一次的统计行可能很久不打印，帧数驱动的看门狗永远不会触发。5s 冷却避免码流
+    // 本身不可解时反复重建刷屏。
+    private var lastWatchdogOut = -1L
+    private var lastOutAdvanceMs = 0L
+    private var lastWatchdogRecreateMs = 0L
+    private var lastPeriodicStatMs = 0L
+    // 解码器侧丢帧数（输入缓冲超限/超时/异常），与队列丢帧 framesDropped 区分打印。
+    @Volatile private var decoderDropped = 0
     // 统计区间内喂给解码线程的 IDR / 带内 SPS 数量（decoder 线程写、reader 线程读）
     // ——下次冻帧时直接区分“手机没发关键帧”与“解码器 wedged”。
     @Volatile private var idrFed = 0
@@ -174,30 +180,55 @@ class MirrorStreamServer(
             if (lastStatMs != 0L) StreamStats.videoFps = (300_000L / (now - lastStatMs).coerceAtLeast(1)).toInt()
             lastStatMs = now
             StreamStats.videoDropPct = framesDropped * 100 / framesIn
-            // out= 是解码器真正渲染到 Surface 的帧数：in 涨而 out 不涨 = 解码器/Surface
-            // 环节卡死（画面冻住但网络日志一切正常），这是定位显示类冻帧的关键判据。
-            val out = decoder?.framesOut ?: -1L
-            val stall = if (out >= 0 && out < framesIn - 120) " NO-OUTPUT-STALL" else ""
-            // pend= 重组缓冲残留（拆包 NAL 暂存）；surf= 当前 Surface 是否存活——
-            // out 冻结时先看 surf：若 surface 已死（例如用户切到了日志页），out 不涨是
-            // 预期行为而非解码器故障。
-            val surf = if (surfaceProvider() != null) "ok" else "lost"
-            // 看门狗：out 在整整一个统计区间（300 帧）里纹丝不动 = 真卡死，请求
-            // decoder 线程重建（冷却期内只请求一次）。
-            if (out >= 0 && out < framesIn - 120 && out == lastStatsOut &&
-                System.currentTimeMillis() - lastStallRequestMs > STALL_RECREATE_COOLDOWN_MS) {
-                stallRecreateRequested = true
-                lastStallRequestMs = System.currentTimeMillis()
-                Logger.w("Mirror: output stall (in=$framesIn out=$out, unchanged) — requesting decoder recreate")
-            }
-            lastStatsOut = out
-            Logger.i("Video stats: in=$framesIn out=$out dropped=$framesDropped " +
-                "(${StreamStats.videoDropPct}%) queue=${queue.size}/$QUEUE_CAPACITY " +
-                "${StreamStats.videoFps}fps nal=$reassembledNals pend=${pendingAvcc.size()}B surf=$surf " +
-                "idr=$idrFed sps=$spsFed$stall")
-            idrFed = 0
-            spsFed = 0
+            logStats()
         }
+    }
+
+    /**
+     * 时间驱动的卡死看门狗 + 周期统计（decoder 线程，每轮循环调用）。
+     * 触发条件：解码器已存在、out 落后 in 超 120 帧、且 out 已 2s 以上纹丝不动——
+     * 静态画面发帧少时帧数驱动的统计行可能很久不打印，时间驱动才能覆盖这种
+     * 情况。触发后重建解码器并在下一个 IDR 处重同步（rebuildDecoder 置
+     * awaitingKeyframe）；5s 冷却避免码流本身不可解时反复重建刷屏。
+     * 周期统计：静态画面下 300 帧一次的统计行可能很久不打印，每 10s 补一行，
+     * 避免“没有 in=600 行”被误读为流停了。
+     */
+    private fun checkStallWatchdog() {
+        val d = decoder ?: return
+        val out = d.framesOut
+        val now = System.currentTimeMillis()
+        if (out != lastWatchdogOut) {
+            lastWatchdogOut = out
+            lastOutAdvanceMs = now
+        } else if (framesIn - out > STALL_GAP_FRAMES && now - lastOutAdvanceMs > STALL_QUIET_MS &&
+            now - lastWatchdogRecreateMs > STALL_RECREATE_COOLDOWN_MS) {
+            lastWatchdogRecreateMs = now
+            Logger.w("Mirror: output stall (in=$framesIn out=$out, quiet ${now - lastOutAdvanceMs}ms) — recreating decoder")
+            rebuildDecoder(surfaceProvider())
+        }
+        if (lastPeriodicStatMs == 0L) lastPeriodicStatMs = now
+        if (now - lastPeriodicStatMs > PERIODIC_STAT_MS && framesIn > 0) {
+            lastPeriodicStatMs = now
+            logStats()
+        }
+    }
+
+    /**
+     * 打印一次视频统计行。out= 是解码器真正渲染到 Surface 的帧数：in 涨而 out
+     * 不涨 = 解码器/Surface 环节卡死（画面冻住但网络日志一切正常），这是定位显示
+     * 类冻帧的关键判据。pend= 重组缓冲残留；surf= 当前 Surface 是否存活（若已死，
+     * 例如用户切到了日志页，out 不涨是预期行为而非解码器故障）。
+     */
+    private fun logStats() {
+        val out = decoder?.framesOut ?: -1L
+        val stall = if (out >= 0 && out < framesIn - 120) " NO-OUTPUT-STALL" else ""
+        val surf = if (surfaceProvider() != null) "ok" else "lost"
+        Logger.i("Video stats: in=$framesIn out=$out dropped=$framesDropped decDrop=$decoderDropped " +
+            "(${StreamStats.videoDropPct}%) queue=${queue.size}/$QUEUE_CAPACITY " +
+            "${StreamStats.videoFps}fps nal=$reassembledNals pend=${pendingAvcc.size()}B surf=$surf " +
+            "idr=$idrFed sps=$spsFed$stall")
+        idrFed = 0
+        spsFed = 0
     }
 
     /**
@@ -258,12 +289,8 @@ class MirrorStreamServer(
     private fun runDecoder() {
         try {
             while (running) {
-                if (stallResetRequested) {
-                    stallResetRequested = false
-                    queue.clear()
-                    rebuildDecoder(surfaceProvider())
-                    Logger.i("Mirror: decoder reset after output stall (awaiting keyframe)")
-                }
+                // 时间驱动的卡死看门狗 + 周期统计（见 checkStallWatchdog 注释）。
+                checkStallWatchdog()
                 val item = queue.poll(200, TimeUnit.MILLISECONDS) ?: continue
                 when (item) {
                     is Config -> configureDecoder(item.sps, item.pps)
@@ -279,14 +306,17 @@ class MirrorStreamServer(
     }
 
     private fun configureDecoder(sps: ByteArray, pps: ByteArray) {
-        // New SPS/PPS (or first config) — cache it and (re)build against the current surface.
+        // 先无阻塞判断“配置未变”：重复的 type-1 配置是常态，绝不能每次都进
+        // awaitSurface()——Surface 短暂为 null 时它会在解码线程上阻塞最长 5s，
+        // 期间 reader 继续填 90 槽队列并丢最老项（常是 IDR），还置 awaitingKeyframe。
+        // 只有真正要重建时才等 Surface；Surface 已在手时直接用，不等待。
         val d = decoder
-        val surface = awaitSurface()
+        val surface = surfaceProvider()
         if (d != null && d.isHealthy && sps.contentEquals(lastSps) && pps.contentEquals(lastPps) &&
             surface === configuredSurface) return
         lastSps = sps
         lastPps = pps
-        rebuildDecoder(surface)
+        rebuildDecoder(surface ?: awaitSurface())
     }
 
     /**
@@ -315,13 +345,6 @@ class MirrorStreamServer(
         val liveSurface = surfaceProvider()
         if (liveSurface !== configuredSurface) {
             Logger.i("Mirror: surface ${if (liveSurface == null) "lost" else "changed"} — re-attaching decoder")
-            rebuildDecoder(liveSurface)
-        }
-        // 看门狗：输出卡死时重建解码器（见字段注释；decoder 线程执行）。
-        if (stallRecreateRequested) {
-            stallRecreateRequested = false
-            Logger.i("Mirror: recreating decoder after output stall " +
-                "(in=$framesIn out=${decoder?.framesOut})")
             rebuildDecoder(liveSurface)
         }
         // NAL 普查：记 IDR / 带内 SPS，并检测带内 SPS 变化。换播或旋转导致编码参数
@@ -357,7 +380,12 @@ class MirrorStreamServer(
             Logger.i("Mirror: resynced on keyframe after a dropped frame")
         }
         if (framePtsUs == 0L) Logger.i("Mirror: first video frame fed to decoder (${annexB.size}B)")
-        d.decodeNalUnit(annexB, framePtsUs)
+        // 解码器丢帧（超限/超时/异常）即断参考链：必须等下一个 IDR，否则后续 P 帧
+        // 只会让解码器静默不出帧。
+        if (!d.decodeNalUnit(annexB, framePtsUs)) {
+            decoderDropped++
+            awaitingKeyframe = true
+        }
         framePtsUs += FRAME_INTERVAL_US
     }
 
@@ -452,7 +480,10 @@ class MirrorStreamServer(
         private const val MAX_PAYLOAD = 8 * 1024 * 1024        // 8 MB sanity cap per frame
         private const val FRAME_INTERVAL_US = 1_000_000L / 60  // monotonic PTS hint (~60fps)
         private const val QUEUE_CAPACITY = 90                  // ~1.5s @60fps before dropping
+        private const val STALL_GAP_FRAMES = 120               // 看门狗：out 落后 in 的帧数阈值
+        private const val STALL_QUIET_MS = 2000L               // 看门狗：out 纹丝不动的时长阈值
         private const val STALL_RECREATE_COOLDOWN_MS = 5000L   // 看门狗重建冷却（见字段注释）
+        private const val PERIODIC_STAT_MS = 10000L            // 周期统计间隔（静态画面补统计行）
         private const val SURFACE_WAIT_TRIES = 50
         private const val SURFACE_WAIT_MS = 100L
     }

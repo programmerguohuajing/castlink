@@ -123,6 +123,10 @@ class VideoDecoder(private val outputSurface: Surface, private val codec: com.ca
             // NOTE: do NOT set KEY_MAX_WIDTH/HEIGHT here — this SoC's MStar decoder rejects
             // adaptive playback (BadParameter / buffer-count failures) and produces banding.
             // Resolution changes are handled by recreating the decoder in MirrorStreamServer.
+            // 但 KEY_MAX_INPUT_SIZE 必须设：iPhone 大关键帧（竖屏高分辨率）可能超过解码器
+            // 默认输入缓冲，之前超限帧被静默丢弃且不断参考链（见 decodeNalUnit）。2MB
+            // 只是请求值，不支持的 SoC 会忽略；与上面禁用的自适应宽高是两回事。
+            setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, 2 * 1024 * 1024)
         }
 
         // Create the hardware H.264 decoder.
@@ -158,11 +162,16 @@ class VideoDecoder(private val outputSurface: Surface, private val codec: com.ca
      *
      * @param nalUnit The raw NAL unit bytes (without the RTP header).
      * @param presentationTimeUs Presentation timestamp in microseconds (for A/V sync).
+     * @return true if the NAL unit was queued to the decoder; false if it was dropped
+     * (oversized, no input buffer, or decode error). The caller (mirror server) must set
+     * awaitingKeyframe on false — a dropped frame breaks the reference chain, and
+     * feeding further P-frames only leaves the decoder silently outputting nothing
+     * (observed as in rising with out flat and no errors).
      */
-    fun decodeNalUnit(nalUnit: ByteArray, presentationTimeUs: Long) {
+    fun decodeNalUnit(nalUnit: ByteArray, presentationTimeUs: Long): Boolean {
         val codec = mediaCodec ?: run {
             Logger.w("decodeNalUnit() called but decoder not initialized")
-            return
+            return false
         }
 
         try {
@@ -180,10 +189,10 @@ class VideoDecoder(private val outputSurface: Surface, private val codec: com.ca
                 val inputBuffer = codec.getInputBuffer(inputBufferIndex)!!
                 if (nalUnit.size > inputBuffer.capacity()) {
                     // 超过输入缓冲容量时 put() 会抛 BufferOverflowException 被泛捕获，
-                    // 日志看不出真因；这里显式记录并丢弃，避免误判为解码错误。
+                    // 日志看不出真因；这里显式记录并丢弃，调用方据返回值重同步。
                     Logger.e("VideoDecoder: NAL ${nalUnit.size}B exceeds input buffer " +
                         "${inputBuffer.capacity()}B — dropping")
-                    return
+                    return false
                 }
                 inputBuffer.clear()
                 inputBuffer.put(nalUnit)
@@ -201,18 +210,23 @@ class VideoDecoder(private val outputSurface: Surface, private val codec: com.ca
                 // No input buffer available — the decoder is catching up.
                 // Drop this NAL unit to avoid building up backlog (prefer low latency).
                 Logger.v("VideoDecoder: no input buffer available, dropping NAL unit")
+                releaseOutputBuffers(codec)
+                return false
             }
 
             // Release any output buffers that MediaCodec has finished decoding.
             // render=true means the frame goes to the Surface immediately.
             releaseOutputBuffers(codec)
+            return true
 
         } catch (e: IllegalStateException) {
             // MediaCodec is now in the error state and cannot recover — flag for recreation.
             Logger.e("VideoDecoder entered error state — will recreate", e)
             isHealthy = false
+            return false
         } catch (e: Exception) {
             Logger.e("Error decoding NAL unit", e)
+            return false
         }
     }
 
