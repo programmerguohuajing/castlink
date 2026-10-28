@@ -1,1 +1,1 @@
-{"_comment":"CastLink OTA","apkUrl":"https://github.com/programmerguohuajing/castlink/releases/download/v0.1.51/CastLink-v0.1.51.apk","changelog":"v0.1.51\n- 修复隔空播放播一阵后画面卡住（有声无画）：解码器无报错只进不出时自动重建并在下一个关键帧重同步；换播导致编码参数变化时按带内新 SPS 重建","versionCode":72,"versionName":"0.1.51"}
+{"_comment":"CastLink OTA","apkUrl":"https://github.com/programmerguohuajing/castlink/releases/download/v0.1.52/CastLink-v0.1.52.apk","changelog":"v0.1.52\n- 按代码评审修复隔空播放冻帧：修复编译断裂；大关键帧超限、解码超时、异常丢帧都会触发等下一个关键帧重同步；卡死看门狗改为时间驱动；重复配置不再阻塞解码线程","versionCode":73,"versionName":"0.1.52"}
