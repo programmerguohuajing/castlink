@@ -101,6 +101,8 @@ class MirrorStreamServer(
     private var watchdogRebuildCount = 0
     // 本会话累计 IDR 数（不清零）：看门狗触发时据此判断“手机到底发没发过关键帧”。
     private var idrTotal = 0
+    // 已打印 NAL 构成的包数（decoder 线程）：只打前 3 个包，确认首包结构。
+    private var loggedBlobCount = 0
     // 解码器侧丢帧数（输入缓冲超限/超时/异常），与队列丢帧 framesDropped 区分打印。
     @Volatile private var decoderDropped = 0
     // 统计区间内喂给解码线程的 IDR / 带内 SPS 数量（decoder 线程写、reader 线程读）
@@ -403,6 +405,14 @@ class MirrorStreamServer(
                 }
             }
         }
+        // 前 3 个包的 NAL 构成（诊断用）：确认首个包里到底有没有 SPS+PPS+IDR，
+        // 避免下次再靠猜。扫描方式同 censusNals。
+        if (loggedBlobCount < 3) {
+            loggedBlobCount++
+            runCatching {
+                Logger.i("Mirror: blob #$loggedBlobCount NALs: ${nalInfo(annexB)} (${annexB.size}B)")
+            }
+        }
         val d = decoder ?: return                              // need surface + SPS/PPS first
         if (!d.isHealthy) {                                    // error state — drop, await next config
             Logger.w("Mirror: decoder unhealthy — dropping, awaiting new SPS/PPS")
@@ -464,6 +474,30 @@ class MirrorStreamServer(
         }
         flush(annexB.size)
         return NalCensus(idr, sps, pps)
+    }
+
+    /** 把 Annex-B 块的 NAL 构成格式化为 "7:18B, 8:4B, 5:9123B, ..."（诊断首包结构用）。 */
+    private fun nalInfo(annexB: ByteArray): String {
+        val parts = ArrayList<String>()
+        var curHeader = -1
+        var i = 0
+        fun flush(end: Int) {
+            if (curHeader < 0 || end <= curHeader) return
+            val type = annexB[curHeader].toInt() and 0x1F
+            parts.add("$type:${end - curHeader}B")
+        }
+        while (i + 2 < annexB.size) {
+            if (annexB[i].toInt() == 0 && annexB[i + 1].toInt() == 0 && annexB[i + 2].toInt() == 1) {
+                flush(i)
+                val header = i + 3
+                curHeader = if (header < annexB.size) header else -1
+                i = header
+            } else {
+                i++
+            }
+        }
+        flush(annexB.size)
+        return if (parts.isEmpty()) "(no start codes)" else parts.joinToString(", ")
     }
 
     private fun trimTrailingZeros(data: ByteArray): ByteArray {

@@ -13,8 +13,8 @@ android {
         targetSdk = 34
         // v0.3.1：QA 修复版（国际化硬编码收敛、删无用权限、补 launcher icon、注释修正）。
         // 注意：沙箱内实际打包走 tools/build_manual.sh（手工链），此处仅保持声明同步。
-        versionCode = 74
-        versionName = "0.1.53"
+        versionCode = 75
+        versionName = "0.1.54"
     }
 
     buildTypes {

@@ -217,27 +217,12 @@ class VideoDecoder(
             // frames) and causes a black screen until the next keyframe, so we avoid it.
             releaseOutputBuffers(codec)
 
-            // Annex-B 输入按起始码拆成单个 NAL、每 NAL 单独一个 input buffer。
-            // 镜像重组会把多个 NAL（含跨包拼出的前一画面尾巴 + 后一画面）打进同
-            // 一个 buffer，挑剔的电视 SoC 解码器可能因此乱掉参考状态、无报错卡
-            // 死（实测 in 涨 out 不涨、全计数器绿）。单 NAL 一 buffer 是最标准
-            // 的喂法；SEI/AUD/filler 按定义可安全跳过（不影响参考链）。
-            // 无起始码的输入（如旧 RTSP 路径的裸 NAL）回退为整包直喂，保持旧行为。
-            val nals = splitAnnexB(nalUnit)
-            val fed = if (nals.isEmpty()) {
-                queueOneNal(codec, nalUnit, presentationTimeUs)
-            } else {
-                var ok = true
-                for ((header, end) in nals) {
-                    val type = nalUnit[header].toInt() and 0x1F
-                    if (type == 6 || type == 9 || type == 12) continue // SEI / AUD / filler
-                    val buf = ByteArray(4 + (end - header))
-                    buf[0] = 0; buf[1] = 0; buf[2] = 0; buf[3] = 1
-                    nalUnit.copyInto(buf, 4, header, end)
-                    if (!queueOneNal(codec, buf, presentationTimeUs)) { ok = false; break }
-                }
-                ok
-            }
+            // 整包直喂（v0.1.52 的方式）。v0.1.53 曾改为按起始码拆成单个 NAL、
+            // 每 NAL 单独一个 buffer 并跳过 SEI/AUD/filler；但 v0.1.53 实测首个
+            // 解码器从第一帧起 out=0（硬解、软解皆如此），而 v0.1.52 整包喂时出
+            // 过 10 帧——不管理论上拆分多标准，实测它让情况变差，故回退。拆分假说
+            // 不再推进，除非有证据表明整包喂本身有问题。
+            val fed = queueOneNal(codec, nalUnit, presentationTimeUs)
 
             // Release any output buffers that MediaCodec has finished decoding.
             // render=true means the frame goes to the Surface immediately.
@@ -290,28 +275,7 @@ class VideoDecoder(
         return true
     }
 
-    /**
-     * 把 Annex-B 块按起始码拆成 NAL 范围列表，每项为 (headerPos, end)：headerPos
-     * 是 NAL 头字节位置，end 是下一个起始码的起始位置（4 字节码的首个 0 会被算进
-     * 上一个 NAL 的尾巴——那只是合法的前导零，不影响解码）。无起始码时返回空表。
-     */
-    private fun splitAnnexB(data: ByteArray): List<Pair<Int, Int>> {
-        val out = ArrayList<Pair<Int, Int>>()
-        var curHeader = -1
-        var i = 0
-        while (i + 2 < data.size) {
-            if (data[i].toInt() == 0 && data[i + 1].toInt() == 0 && data[i + 2].toInt() == 1) {
-                if (curHeader >= 0) out.add(Pair(curHeader, i))
-                val header = i + 3
-                curHeader = if (header < data.size) header else -1
-                i = header
-            } else {
-                i++
-            }
-        }
-        if (curHeader >= 0) out.add(Pair(curHeader, data.size))
-        return out
-    }
+
 
     /**
      * Releases any decoded output buffers back to MediaCodec and renders them to the Surface.
