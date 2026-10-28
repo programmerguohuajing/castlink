@@ -105,6 +105,10 @@ class MirrorStreamServer(
     private var loggedBlobCount = 0
     // 是否已打印首个 IDR 的头字节（decoder 线程）：只打一次。
     private var firstIdrLogged = false
+    // 视频重连是否已触发（decoder 线程）：软解也救不回来时，关闭视频数据连接
+    // 一次，迫使手机重新 SETUP 视频流、发新关键帧；音频是独立服务，不受影响。
+    // 每会话一次；重 SETUP 会建全新 MirrorStreamServer，自带新 flag。
+    private var videoRestartAttempted = false
     // 解码器侧丢帧数（输入缓冲超限/超时/异常），与队列丢帧 framesDropped 区分打印。
     @Volatile private var decoderDropped = 0
     // 统计区间内喂给解码线程的 IDR / 带内 SPS 数量（decoder 线程写、reader 线程读）
@@ -232,6 +236,16 @@ class MirrorStreamServer(
                 Logger.w("Mirror: output stall (in=$framesIn out=$out, sessionIdr=$idrTotal) — hardware decoder stalled twice, switching to software AVC decoder")
             } else {
                 Logger.w("Mirror: output stall (in=$framesIn out=$out, quiet ${now - lastOutAdvanceMs}ms, sessionIdr=$idrTotal) — recreating decoder")
+            }
+            if (watchdogRebuildCount >= 4 && !videoRestartAttempted) {
+                // 软解已重建两次仍无输出：参考帧本身已坏（截断 IDR + 无第二 IDR），
+                // 再重建解码器没有意义。关闭视频数据连接是接收端唯一能让手机重新
+                // SETUP 视频流、发新关键帧的触发；音频独立，不受影响。本会话一次。
+                // 若手机不重 SETUP，视频维持原状（本来就已冻住），不更差。
+                videoRestartAttempted = true
+                Logger.w("Mirror: video frozen after software fallback (in=$framesIn out=$out, sessionIdr=$idrTotal) — closing video data connection to force phone to re-SETUP video with a fresh keyframe")
+                runCatching { client?.close() }
+                return
             }
             rebuildDecoder(surfaceProvider())
         }
