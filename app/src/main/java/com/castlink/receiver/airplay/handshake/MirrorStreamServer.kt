@@ -103,6 +103,8 @@ class MirrorStreamServer(
     private var idrTotal = 0
     // 已打印 NAL 构成的包数（decoder 线程）：只打前 3 个包，确认首包结构。
     private var loggedBlobCount = 0
+    // 是否已打印首个 IDR 的头字节（decoder 线程）：只打一次。
+    private var firstIdrLogged = false
     // 解码器侧丢帧数（输入缓冲超限/超时/异常），与队列丢帧 framesDropped 区分打印。
     @Volatile private var decoderDropped = 0
     // 统计区间内喂给解码线程的 IDR / 带内 SPS 数量（decoder 线程写、reader 线程读）
@@ -359,9 +361,11 @@ class MirrorStreamServer(
         val sps = lastSps ?: return
         val pps = lastPps ?: return
         if (surface == null) return                            // backgrounded — wait for the surface to return
-        val sc = MirrorCrypto.START_CODE
         try {
-            decoder = VideoDecoder(surface, preferSoftware = useSoftwareDecoder).also { it.initialize(sc + sps, sc + pps, width, height) }
+            // csd 必须是裸 NAL（RAOP 路径就是这么传的）；镜像路径之前传的是带起始码
+            // 的形式，严格的解码器可能因此认不出配置、永远解不出帧——这正是本会话
+            // 全程 out=0 的最可能解释。改成裸 NAL，与 RAOP 路径一致。
+            decoder = VideoDecoder(surface, preferSoftware = useSoftwareDecoder).also { it.initialize(sps, pps, width, height) }
         } catch (e: Exception) {
             // 初始化失败（例如软解不支持该格式）绝不能杀死解码线程：保持 decoder=null，
             // 看门狗的空闲重建会定期重试；软解失败时下次重试回落硬解。
@@ -405,6 +409,19 @@ class MirrorStreamServer(
                 }
             }
         }
+        // 首个 IDR 的头字节（诊断用）：v0.1.54 实测开流 IDR 仅 418B，而用户播的
+        // 是视频——418B 对 1080p 来说连纯黑画面都不够，这个 IDR 一定有问题。
+        // 头字节可手算 slice header（slice_type / pps_id / first_mb），判断它是
+        // 真 IDR、畸形数据，还是引用了未提供的 PPS。只打一次。
+        if (!firstIdrLogged) {
+            runCatching {
+                val hex = firstIdrHeadHex(annexB)
+                if (hex != null) {
+                    firstIdrLogged = true
+                    Logger.i("Mirror: first IDR head bytes: $hex")
+                }
+            }
+        }
         // 前 3 个包的 NAL 构成（诊断用）：确认首个包里到底有没有 SPS+PPS+IDR，
         // 避免下次再靠猜。扫描方式同 censusNals。
         if (loggedBlobCount < 3) {
@@ -427,9 +444,19 @@ class MirrorStreamServer(
             Logger.i("Mirror: resynced on keyframe after a dropped frame")
         }
         if (framePtsUs == 0L) Logger.i("Mirror: first video frame fed to decoder (${annexB.size}B)")
+        // IDR 前补一份带内 SPS/PPS（标准码流本就如此）：即使解码器不认 csd，
+        // 也能从流内拿到配置。IDR 本来就稀少（本会话仅 1 个），开销可忽略。
+        val feedBlob = if (isKeyframe(annexB)) {
+            val sps = lastSps
+            val pps = lastPps
+            if (sps != null && pps != null) {
+                val sc = MirrorCrypto.START_CODE
+                sc + sps + sc + pps + annexB
+            } else annexB
+        } else annexB
         // 解码器丢帧（超限/超时/异常）即断参考链：必须等下一个 IDR，否则后续 P 帧
         // 只会让解码器静默不出帧。
-        if (!d.decodeNalUnit(annexB, framePtsUs)) {
+        if (!d.decodeNalUnit(feedBlob, framePtsUs)) {
             decoderDropped++
             awaitingKeyframe = true
         }
@@ -474,6 +501,32 @@ class MirrorStreamServer(
         }
         flush(annexB.size)
         return NalCensus(idr, sps, pps)
+    }
+
+    /** 首个 IDR NAL 的前 16 字节 hex（诊断用）：可手算 slice header，判断它是真 IDR
+     * 还是畸形数据。找不到 IDR 时返回 null。注意字节要 & 0xFF，否则 %02x 会把负字节
+     * 打成 ffffff88 这种符号扩展形式。 */
+    private fun firstIdrHeadHex(annexB: ByteArray): String? {
+        var curHeader = -1
+        var i = 0
+        while (i + 2 < annexB.size) {
+            if (annexB[i].toInt() == 0 && annexB[i + 1].toInt() == 0 && annexB[i + 2].toInt() == 1) {
+                if (curHeader >= 0 && annexB[curHeader].toInt() and 0x1F == 5) {
+                    val end = minOf(i, curHeader + 16)
+                    return annexB.slice(curHeader until end).joinToString(" ") { "%02x".format(it.toInt() and 0xFF) }
+                }
+                val header = i + 3
+                curHeader = if (header < annexB.size) header else -1
+                i = header
+            } else {
+                i++
+            }
+        }
+        if (curHeader >= 0 && annexB[curHeader].toInt() and 0x1F == 5) {
+            val end = minOf(annexB.size, curHeader + 16)
+            return annexB.slice(curHeader until end).joinToString(" ") { "%02x".format(it.toInt() and 0xFF) }
+        }
+        return null
     }
 
     /** 把 Annex-B 块的 NAL 构成格式化为 "7:18B, 8:4B, 5:9123B, ..."（诊断首包结构用）。 */
