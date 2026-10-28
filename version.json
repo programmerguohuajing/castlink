@@ -1,1 +1,1 @@
-{"_comment":"CastLink OTA","apkUrl":"https://github.com/programmerguohuajing/castlink/releases/download/v0.1.53/CastLink-v0.1.53.apk","changelog":"v0.1.53\n- 修复隔空播放卡死：每 NAL 单独喂解码器；硬解两次重建无果后自动切系统软解；解码器初始化失败定期重试","versionCode":74,"versionName":"0.1.53"}
+{"_comment":"CastLink OTA","apkUrl":"https://github.com/programmerguohuajing/castlink/releases/download/v0.1.54/CastLink-v0.1.54.apk","changelog":"v0.1.54\n- 回退整包喂帧；软解兜底保留；新增前 3 个包 NAL 构成日志","versionCode":75,"versionName":"0.1.54"}
