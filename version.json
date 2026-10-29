@@ -1,1 +1,1 @@
-{"_comment":"CastLink OTA","apkUrl":"https://github.com/programmerguohuajing/castlink/releases/download/v0.1.58/CastLink-v0.1.58.apk","changelog":"v0.1.58\n- GOP 缓存重放自愈；硬解卡死换软解重放；看门狗 fed 判据","versionCode":79,"versionName":"0.1.58"}
+{"_comment":"CastLink OTA","apkUrl":"https://github.com/programmerguohuajing/castlink/releases/download/v0.1.59/CastLink-v0.1.59.apk","changelog":"v0.1.59\n- Android→Android 接收端真全屏（居中缩放+自动填充/适应）","versionCode":80,"versionName":"0.1.59"}
