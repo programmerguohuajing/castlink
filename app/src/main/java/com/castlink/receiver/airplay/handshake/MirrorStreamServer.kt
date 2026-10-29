@@ -45,6 +45,8 @@ class MirrorStreamServer(
     private val surfaceProvider: () -> Surface?,
     private val width: Int = 1920,
     private val height: Int = 1080,
+    // 软解被确认可用时回调一次（AirPlayReceiver 据此把“本机硬解不行”持久化，重启后仍生效）。
+    private val onSoftwareConfirmed: (() -> Unit)? = null,
 ) {
     private sealed class Item
     private class Config(val sps: ByteArray, val pps: ByteArray) : Item()
@@ -104,7 +106,7 @@ class MirrorStreamServer(
     // 时间驱动而非帧数驱动——静态画面发帧少时统计行可能很久不打印。5s 冷却避免码流本身
     // 不可解时反复重建刷屏。
     private var lastWatchdogOut = -1L
-    private var lastOutAdvanceMs = 0L
+    @Volatile private var lastOutAdvanceMs = 0L   // decoder 线程写；logStats 也从 reader 线程读
     private var lastWatchdogRecreateMs = 0L
     private var lastPeriodicStatMs = 0L
     // 软解兜底：硬解卡死（喂进去不少帧却长时间无输出）时，换系统软解并从 GOP 缓存重放，
@@ -261,6 +263,7 @@ class MirrorStreamServer(
             if (softwareFromStall && !hardwareKnownBad && out >= SW_CONFIRM_FRAMES) {
                 hardwareKnownBad = true
                 Logger.i("Mirror: software decoder is rendering (out=$out) — later sessions will start with software")
+                onSoftwareConfirmed?.invoke()      // 持久化：重启后第一次连接就走软解 + 720p
             }
         } else if (decoderFed - out >= STALL_GAP_FED && now - lastOutAdvanceMs > STALL_QUIET_MS &&
             now - lastWatchdogRecreateMs > STALL_RECREATE_COOLDOWN_MS) {
@@ -314,7 +317,10 @@ class MirrorStreamServer(
      */
     private fun logStats() {
         val out = decoder?.framesOut ?: -1L
-        val stall = if (out >= 0 && decoderFed - out >= STALL_GAP_FED) " NO-OUTPUT-STALL" else ""
+        // 与看门狗同判据（缺口 + out 静默超时）才标 STALL：软解正常管线深度就有约
+        // 13 帧，只看缺口会每行误报（v0.1.61 实测）。
+        val stall = if (out >= 0 && decoderFed - out >= STALL_GAP_FED &&
+            System.currentTimeMillis() - lastOutAdvanceMs > STALL_QUIET_MS) " NO-OUTPUT-STALL" else ""
         val surf = if (surfaceProvider() != null) "ok" else "lost"
         Logger.i("Video stats: in=$framesIn fed=$decoderFed out=$out gated=$gatedFrames dropped=$framesDropped " +
             "decDrop=$decoderDropped (${StreamStats.videoDropPct}%) queue=${queue.size}/$QUEUE_CAPACITY " +
@@ -772,10 +778,15 @@ class MirrorStreamServer(
         private const val SURFACE_WAIT_MS = 100L
 
         // 进程内记忆：本进程里已确认“硬解卡死、软解能出帧”后，后续会话直接用软解，免得每次
-        // 先卡 2–3 秒再切换。进程重启后重新探测。
+        // 先卡 2–3 秒再切换。另由 AirPlayReceiver 持久化（确认时经 onSoftwareConfirmed
+        // 回调写入 prefs，启动时 setHardwareKnownBad 回填）——这是设备属性，只靠进程
+        // 记忆时每次重启 App/电视都要重新楔一次硬解 + 跑一段 1080p 软解（v0.1.61 实测）。
         @Volatile private var hardwareKnownBad = false
 
         /** 本进程是否已确认“硬解卡死、软解可用”——RtspHandler 的 /info 据此广播 720p。 */
         fun isHardwareKnownBad(): Boolean = hardwareKnownBad
+
+        /** 启动回填：AirPlayReceiver 从持久化存储读到“硬解不行”时调用。 */
+        fun setHardwareKnownBad(value: Boolean) { hardwareKnownBad = value }
     }
 }

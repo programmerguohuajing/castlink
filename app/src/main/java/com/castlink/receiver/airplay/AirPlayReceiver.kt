@@ -152,6 +152,13 @@ class AirPlayReceiver(
      */
     fun start() {
         Logger.i("AirPlayReceiver starting (displayName='$displayName')")
+        // 回填“本机硬解不行”的持久化标记（以往运行确认过）：/info 据此从第一次连接
+        // 就广播 720p、新会话直用软解，不必每个进程都先楔一次硬解 + 跑一段 1080p 软解。
+        if (context.getSharedPreferences(PREFS_FILE, Context.MODE_PRIVATE)
+                .getBoolean(PREF_SOFTWARE_DECODE, false)) {
+            MirrorStreamServer.setHardwareKnownBad(true)
+            Logger.i("AirPlay: persisted software-decode preference loaded (hardware decode known bad on this device)")
+        }
         scope.launch {
             try {
                 startTimingHandler()
@@ -533,7 +540,13 @@ class AirPlayReceiver(
     private fun startMirrorStream(streamConnectionId: Long): Int {
         val aesKey = mirrorAesKey ?: run { Logger.e("mirror stream start before keys set"); return 0 }
         val ecdhSecret = mirrorEcdhSecret ?: return 0
-        return MirrorStreamServer(aesKey, ecdhSecret, streamConnectionId, videoSurfaceProvider, mirrorWidth, mirrorHeight)
+        return MirrorStreamServer(aesKey, ecdhSecret, streamConnectionId, videoSurfaceProvider, mirrorWidth, mirrorHeight,
+            onSoftwareConfirmed = {
+                // 软解确认可用 → 持久化“本机硬解不行”，重启后 start() 回填。
+                context.getSharedPreferences(PREFS_FILE, Context.MODE_PRIVATE).edit()
+                    .putBoolean(PREF_SOFTWARE_DECODE, true).apply()
+                Logger.i("AirPlay: software-decode preference persisted")
+            })
             .also { mirrorServer = it; it.start(scope); videoPlaying = true; emitNowPlaying() }
             .dataPort
             .also { Logger.i("Mirror data server started on port $it") }
@@ -682,6 +695,10 @@ class AirPlayReceiver(
         // Real resolution is encoded in the H.264 SPS NAL unit.
         private const val DEFAULT_VIDEO_WIDTH  = 1920
         private const val DEFAULT_VIDEO_HEIGHT = 1080
+
+        // “本机硬解不行 → 用软解 + 广播 720p”的持久化（与 App 其他设置同文件）。
+        private const val PREFS_FILE = "castlink_prefs"
+        private const val PREF_SOFTWARE_DECODE = "airplay_software_decode"
 
         /**
          * UDP port for receiving audio RTP packets.
