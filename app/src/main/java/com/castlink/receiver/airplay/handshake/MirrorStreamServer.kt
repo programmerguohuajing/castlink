@@ -479,7 +479,20 @@ class MirrorStreamServer(
         var fed = 0
         for (blob in frames) {
             if (!running) return
-            if (!d.decodeNalUnit(blob, nextPtsUs())) {
+            // 软解消费慢：刚建好的解码器输入缓冲少（约 4 个），连喂几帧就会短暂
+            // 拿不到缓冲（decodeNalUnit 等 100ms 后返回 false）——这不是拒收，等它
+            // 解完一帧就有缓冲了。v0.1.60 实测重放在 8/84 处因此整段放弃。改为
+            // 排空输出 + 短等后重试同一帧，单帧 3 秒内喂不进（或解码器转入错误态）
+            // 才放弃整段重放。
+            val deadline = System.currentTimeMillis() + REPLAY_FEED_DEADLINE_MS
+            var fedThis = false
+            while (!fedThis && System.currentTimeMillis() < deadline) {
+                if (d.decodeNalUnit(blob, nextPtsUs())) { fedThis = true; break }
+                if (!d.isHealthy) break
+                d.drainOutput()
+                try { Thread.sleep(REPLAY_RETRY_SLEEP_MS) } catch (_: InterruptedException) { return }
+            }
+            if (!fedThis) {
                 Logger.w("Mirror: GOP replay aborted at $fed/${frames.size} (decoder rejected input)")
                 gop.invalidate()
                 return
@@ -741,14 +754,20 @@ class MirrorStreamServer(
 
     companion object {
         private const val MAX_PAYLOAD = 8 * 1024 * 1024        // 8 MB sanity cap per frame
-        // 30（30fps 约 1 秒）：背压下队列深度就是画面延迟上限——150 时软解积压出约
-        // 5 秒声画不同步。重放期间 reader 阻塞等待即可，不再需要大余量。
-        private const val QUEUE_CAPACITY = 30
-        private const val STALL_GAP_FED = 30                   // 看门狗：已喂入却未输出的帧数阈值
+        // 10（30fps 约 0.35 秒）：背压下队列深度就是画面延迟下限的一部分——30 时
+        // 软解稳态积压 30 帧 + 管线约 13 帧 ≈ 1.7 秒声画偏移（v0.1.60 实测）。
+        // 背压保证小队列不丢帧（reader 阻塞等待），重放期间同样靠阻塞扛过去。
+        private const val QUEUE_CAPACITY = 10
+        // 看门狗：已喂入却未输出的帧数阈值。30 时若输入是涓流（静态画面/手机缓冲），
+        // 攒满 30 帧要半分钟，卡死恢复被拖到 40 秒（v0.1.60 实测 out=54 后 31 秒才
+        // 切换）；健康播放时 out 持续前进不会误触发（还要叠加 1.5 秒静默条件），故降到 10。
+        private const val STALL_GAP_FED = 10
         private const val STALL_QUIET_MS = 1500L               // 看门狗：out 纹丝不动的时长阈值
         private const val STALL_RECREATE_COOLDOWN_MS = 5000L   // 看门狗/丢帧重建冷却（见 checkStallWatchdog）
         private const val PERIODIC_STAT_MS = 10000L            // 周期统计间隔（静态画面补统计行）
         private const val SW_CONFIRM_FRAMES = 5L               // 软解出到这么多帧即确认“软解可用”
+        private const val REPLAY_FEED_DEADLINE_MS = 3000L      // 重放单帧喂入的重试期限（等输入缓冲）
+        private const val REPLAY_RETRY_SLEEP_MS = 20L          // 重放重试间隔（期间排空输出）
         private const val SURFACE_WAIT_TRIES = 50
         private const val SURFACE_WAIT_MS = 100L
 
