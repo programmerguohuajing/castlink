@@ -1,1 +1,1 @@
-{"_comment":"CastLink OTA","apkUrl":"https://github.com/programmerguohuajing/castlink/releases/download/v0.1.57/CastLink-v0.1.57.apk","changelog":"v0.1.57\n- PTS 真实时间；IDR 起帧缓存重放；软解切换重放","versionCode":78,"versionName":"0.1.57"}
+{"_comment":"CastLink OTA","apkUrl":"https://github.com/programmerguohuajing/castlink/releases/download/v0.1.58/CastLink-v0.1.58.apk","changelog":"v0.1.58\n- GOP 缓存重放自愈；硬解卡死换软解重放；看门狗 fed 判据","versionCode":79,"versionName":"0.1.58"}
