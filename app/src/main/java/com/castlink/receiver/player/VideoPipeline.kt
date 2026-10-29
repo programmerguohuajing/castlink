@@ -90,8 +90,15 @@ class VideoPipeline(private val surface: Surface) {
                     Log.i(TAG, "decoder output format changed: ${c.outputFormat}")
                     try {
                         val fmt = c.outputFormat
-                        val w = fmt.getInteger(MediaFormat.KEY_WIDTH)
-                        val h = fmt.getInteger(MediaFormat.KEY_HEIGHT)
+                        var w = fmt.getInteger(MediaFormat.KEY_WIDTH)
+                        var h = fmt.getInteger(MediaFormat.KEY_HEIGHT)
+                        // 编码尺寸按 16 对齐时解码器会给裁剪框：用裁剪后的真实显示尺寸，
+                        // 否则宽高比有微小偏差（边缘多出一条绿边/比例不准）。
+                        if (fmt.containsKey("crop-left") && fmt.containsKey("crop-right") &&
+                            fmt.containsKey("crop-top") && fmt.containsKey("crop-bottom")) {
+                            w = fmt.getInteger("crop-right") - fmt.getInteger("crop-left") + 1
+                            h = fmt.getInteger("crop-bottom") - fmt.getInteger("crop-top") + 1
+                        }
                         if (w > 0 && h > 0) { AirPlayLogger.i("VideoPipeline output size ${w}x${h}"); onOutputSizeChanged?.invoke(w, h) }
                     } catch (e: Exception) { }
                     false

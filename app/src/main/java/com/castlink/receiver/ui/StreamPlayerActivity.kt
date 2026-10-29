@@ -2,6 +2,7 @@ package com.castlink.receiver.ui
 
 import android.graphics.Matrix
 import android.graphics.SurfaceTexture
+import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
 import android.util.Log
@@ -11,6 +12,7 @@ import android.view.View
 import android.view.WindowManager
 import android.widget.Button
 import android.widget.TextView
+import android.widget.Toast
 import com.castlink.receiver.R
 import com.castlink.receiver.player.VideoPipeline
 import com.castlink.receiver.airplay.util.Logger as AirPlayLogger
@@ -41,25 +43,27 @@ class StreamPlayerActivity : BaseActivity() {
     @Volatile private var lastNalTime = 0L
     @Volatile private var videoW = 1280f
     @Volatile private var videoH = 720f
+    // 用户点按切换的显示模式：true=填充(裁边铺满) false=适应(黑边)；null=按宽高比自动选。
+    @Volatile private var userFill: Boolean? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        // 刘海/挖孔屏：横屏时允许内容延伸到刘海区域，否则那一侧会留一条黑边，视频铺不满全屏。
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            val lp = window.attributes
+            lp.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            window.attributes = lp
+        }
         // v0.1.14: 沉浸式全屏，隐藏状态栏/导航栏
-        @Suppress("DEPRECATION")
-        window.decorView.systemUiVisibility = (
-            android.view.View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-            or android.view.View.SYSTEM_UI_FLAG_FULLSCREEN
-            or android.view.View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-            or android.view.View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-            or android.view.View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-            or android.view.View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-        )
+        applyImmersive()
         setContentView(R.layout.activity_stream_player)
 
         textureView = findViewById(R.id.tv_stream)
         tvStatus = findViewById(R.id.tv_stream_status)
         findViewById<Button>(R.id.btn_stream_close).setOnClickListener { finish() }
+        // 点按画面切换 填充/适应：自动选择不合心意时可手动改（竖屏视频默认适应，点一下可强制铺满）。
+        textureView.setOnClickListener { toggleFillMode() }
 
         tvStatus.text = getString(R.string.stream_connecting)
         // v0.1.22: TextureView 监听 SurfaceTexture，用 centerCrop 铺满
@@ -142,30 +146,61 @@ class StreamPlayerActivity : BaseActivity() {
     }
 
     /**
-     * v0.1.22: centerCrop 变换，让视频铺满 TextureView（裁掉多余部分）。
-     * 视频 1280x720，View 可能是竖屏或横屏，取最大缩放比铺满。
+     * 沉浸式全屏：隐藏状态栏/导航栏。某些机型在弹窗、通知栏下拉后会丢失沉浸状态，
+     * 所以拿到焦点时再设一次（见 [onWindowFocusChanged]）。
+     */
+    private fun applyImmersive() {
+        @Suppress("DEPRECATION")
+        window.decorView.systemUiVisibility = (
+            View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+            or View.SYSTEM_UI_FLAG_FULLSCREEN
+            or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+            or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+            or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+            or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+        )
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) applyImmersive()
+    }
+
+    /** 当前是否按“填充”显示：用户点按过就用用户的选择，否则按宽高比自动选。 */
+    private fun currentFill(): Boolean =
+        userFill ?: StreamFit.autoFill(textureView.width.toFloat(), textureView.height.toFloat(), videoW, videoH)
+
+    private fun toggleFillMode() {
+        val next = !currentFill()
+        userFill = next
+        updateCropTransform()
+        Toast.makeText(
+            this,
+            if (next) R.string.stream_mode_fill else R.string.stream_mode_fit,
+            Toast.LENGTH_SHORT
+        ).show()
+    }
+
+    /**
+     * 画面缩放：填充(centerCrop，裁边铺满) 或 适应(fit-center，黑边)，见 [StreamFit]。
+     *
+     * 注意 TextureView 的内容默认已被拉伸到铺满 View，矩阵作用在这个已拉伸的内容上，
+     * 所以缩放比是相对 View 的（旧实现按视频尺寸算，导致画面被放大/缩小而不是铺满）。
+     * 视频尺寸用解码器输出的真实尺寸（Fold3 等设备不是 1280x720）。
      */
     private fun updateCropTransform() {
         val viewW = textureView.width.toFloat()
         val viewH = textureView.height.toFloat()
         if (viewW <= 0 || viewH <= 0) return
-        // 视频尺寸：用解码器输出的真实尺寸（Fold3 等设备不是 1280x720）
-        val videoW = this.videoW
-        val videoH = this.videoH
-
-        val scaleX = viewW / videoW
-        val scaleY = viewH / videoH
-        // centerCrop: 取大者，铺满并裁剪
-        val scale = maxOf(scaleX, scaleY)
-
+        val vw = this.videoW
+        val vh = this.videoH
+        val fill = currentFill()
+        val (sx, sy) = StreamFit.scaleFor(viewW, viewH, vw, vh, fill)
         val matrix = Matrix()
-        // 先缩放到铺满，再平移到中心
-        val dx = (viewW - videoW * scale) / 2f
-        val dy = (viewH - videoH * scale) / 2f
-        matrix.setScale(scale, scale)
-        matrix.postTranslate(dx, dy)
+        matrix.setScale(sx, sy, viewW / 2f, viewH / 2f)
         textureView.setTransform(matrix)
-        AirPlayLogger.i("CropTransform: view=${viewW}x${viewH} video=${videoW}x${videoH} scale=$scale dx=$dx dy=$dy")
+        AirPlayLogger.i("StreamFit: view=${viewW.toInt()}x${viewH.toInt()} video=${vw.toInt()}x${vh.toInt()} " +
+            "mode=${if (fill) "fill" else "fit"}${if (userFill != null) "(user)" else ""} sx=$sx sy=$sy")
     }
 
     private fun stopPipeline() {

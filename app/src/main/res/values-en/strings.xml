@@ -74,6 +74,8 @@
     <!-- v0.3.10: native protocol stream player -->
     <string name="stream_connecting">Connecting…</string>
     <string name="stream_close">Disconnect</string>
+    <string name="stream_mode_fill">Display mode: Fill (edges cropped)</string>
+    <string name="stream_mode_fit">Display mode: Fit (whole picture, black bars)</string>
 
     <!-- Device list item -->
     <string name="signal_level">Signal: %1$s</string>

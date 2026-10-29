@@ -74,6 +74,8 @@
     <!-- v0.3.10：原生协议投屏播放页 -->
     <string name="stream_connecting">正在连接…</string>
     <string name="stream_close">断开</string>
+    <string name="stream_mode_fill">画面模式：填充（铺满，裁掉边缘）</string>
+    <string name="stream_mode_fit">画面模式：适应（完整显示，留黑边）</string>
 
     <!-- 设备列表项 -->
     <string name="signal_level">信号：%1$s</string>
