@@ -70,7 +70,17 @@ class MirrorStreamServer(
     // the app backgrounds and creates a NEW one on return, so we watch for the identity changing
     // and rebuild the decoder — otherwise video stays black after foregrounding.
     @Volatile private var configuredSurface: Surface? = null
-    private var framePtsUs = 0L
+    // PTS 基准（decoder 线程）：首帧处理时刻的 nanoTime；PTS = 相对它的 elapsed µs。
+    // 合成步长（之前每包固定 1/60s）会让同一画面的多个 slice 拿到不同时间戳，
+    // 挑剔的解码器可能因此乱掉画面组装；真实时间则不会。
+    private var ptsBaseNs = -1L
+    private var firstFrameLogged = false
+    // IDR 起的帧缓存（decoder 线程）：手机全程只发 1 个 IDR，重建后靠重放它
+    // 恢复参考链，不再依赖手机再发。上限 1500 帧 / 32MB，满了就冻结（保住 IDR
+    // 起的连续前缀；超长会话后期卡死只能走看门狗重连兜底）。
+    private val frameCache = ArrayList<Pair<ByteArray, Long>>()
+    private var frameCacheBytes = 0
+    private var cacheFullLogged = false
     // reader 线程写、decoder 线程的看门狗读——@Volatile 保证可见性（单写者，无竞态）。
     @Volatile private var framesIn = 0
     private var framesDropped = 0
@@ -225,6 +235,9 @@ class MirrorStreamServer(
         if (out != lastWatchdogOut) {
             lastWatchdogOut = out
             lastOutAdvanceMs = now
+            // 解码器恢复出帧了：重建计数清零，下次再卡时重新走“重建→软解→重连”
+            // 的阶梯，而不是直接跳到重连。
+            watchdogRebuildCount = 0
         } else if (framesIn - out > STALL_GAP_FRAMES && now - lastOutAdvanceMs > STALL_QUIET_MS &&
             now - lastWatchdogRecreateMs > STALL_RECREATE_COOLDOWN_MS) {
             lastWatchdogRecreateMs = now
@@ -391,7 +404,21 @@ class MirrorStreamServer(
             decoder = null
             return
         }
-        awaitingKeyframe = true                                // a fresh decoder must start at an IDR
+        val fresh = decoder
+        if (fresh != null && frameCache.isNotEmpty()) {
+            // 重放缓存：新解码器从 IDR 起重建参考链，不再依赖手机再发 IDR。
+            // 重放是尽力而为（掉帧只记数，不置 awaitingKeyframe——等一个永不
+            // 来的 IDR 比断链更糟）；重放后直播帧可直接喂。软解切换也走这里，
+            // 所以③（换软解并重放）天然成立，无需单独代码。
+            var replayDropped = 0
+            for ((blob, pts) in frameCache) {
+                if (!fresh.decodeNalUnit(blob, pts)) replayDropped++
+            }
+            Logger.i("Mirror: replayed ${frameCache.size} cached frames to rebuilt decoder (dropped=$replayDropped)")
+            awaitingKeyframe = false
+        } else {
+            awaitingKeyframe = true                            // a fresh decoder must start at an IDR
+        }
         StreamStats.videoRes = "${width}x${height}"
         Logger.i("Mirror decoder (re)built for surface (sps=${sps.size}B pps=${pps.size}B)")
     }
@@ -457,7 +484,14 @@ class MirrorStreamServer(
             awaitingKeyframe = false
             Logger.i("Mirror: resynced on keyframe after a dropped frame")
         }
-        if (framePtsUs == 0L) Logger.i("Mirror: first video frame fed to decoder (${annexB.size}B)")
+        // PTS 用真实时间：首帧处理时刻起的 elapsed µs（队列平时是空的，处理时刻
+        // ≈ 到达时刻）。合成步长已删。
+        if (ptsBaseNs < 0) ptsBaseNs = System.nanoTime()
+        val ptsUs = (System.nanoTime() - ptsBaseNs) / 1000
+        if (!firstFrameLogged) {
+            firstFrameLogged = true
+            Logger.i("Mirror: first video frame fed to decoder (${annexB.size}B)")
+        }
         // IDR 前补一份带内 SPS/PPS（标准码流本就如此）：即使解码器不认 csd，
         // 也能从流内拿到配置。IDR 本来就稀少（本会话仅 1 个），开销可忽略。
         val feedBlob = if (isKeyframe(annexB)) {
@@ -468,13 +502,29 @@ class MirrorStreamServer(
                 sc + sps + sc + pps + annexB
             } else annexB
         } else annexB
+        // 缓存本帧（含 IDR 前补的带内 SPS/PPS）：重建后重放用。只缓存真正喂给
+        // 解码器的帧，门限挡掉的（无参考的 P 帧）不缓存。
+        cacheFrame(feedBlob, ptsUs)
         // 解码器丢帧（超限/超时/异常）即断参考链：必须等下一个 IDR，否则后续 P 帧
         // 只会让解码器静默不出帧。
-        if (!d.decodeNalUnit(feedBlob, framePtsUs)) {
+        if (!d.decodeNalUnit(feedBlob, ptsUs)) {
             decoderDropped++
             awaitingKeyframe = true
         }
-        framePtsUs += FRAME_INTERVAL_US
+    }
+
+    /** 缓存一帧（供解码器重建后重放）。上限 1500 帧 / 32MB，满了就冻结缓存
+     * （保住 IDR 起的连续前缀；超长会话后期卡死只能走看门狗重连兜底）。 */
+    private fun cacheFrame(blob: ByteArray, ptsUs: Long) {
+        if (frameCache.size >= FRAME_CACHE_MAX_FRAMES || frameCacheBytes >= FRAME_CACHE_MAX_BYTES) {
+            if (!cacheFullLogged) {
+                cacheFullLogged = true
+                Logger.w("Mirror: frame cache full (${frameCache.size} frames, ${frameCacheBytes}B) — freezing, replay covers session start only")
+            }
+            return
+        }
+        frameCache.add(Pair(blob, ptsUs))
+        frameCacheBytes += blob.size
     }
 
     /** 单次扫描 Annex-B 块的结果：IDR 数量、首个 SPS 与首个 PPS 的原始字节。 */
@@ -616,7 +666,8 @@ class MirrorStreamServer(
 
     companion object {
         private const val MAX_PAYLOAD = 8 * 1024 * 1024        // 8 MB sanity cap per frame
-        private const val FRAME_INTERVAL_US = 1_000_000L / 60  // monotonic PTS hint (~60fps)
+        private const val FRAME_CACHE_MAX_FRAMES = 1500
+        private const val FRAME_CACHE_MAX_BYTES = 32 * 1024 * 1024
         private const val QUEUE_CAPACITY = 90                  // ~1.5s @60fps before dropping
         private const val STALL_GAP_FRAMES = 120               // 看门狗：out 落后 in 的帧数阈值
         private const val STALL_QUIET_MS = 2000L               // 看门狗：out 纹丝不动的时长阈值
