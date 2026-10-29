@@ -6,6 +6,7 @@ package com.castlink.receiver.airplay
 
 import com.castlink.receiver.airplay.handshake.FairPlay
 import com.castlink.receiver.airplay.handshake.InfoResponder
+import com.castlink.receiver.airplay.handshake.MirrorStreamServer
 import com.castlink.receiver.airplay.handshake.PairingKeys
 import com.castlink.receiver.airplay.handshake.PairingSession
 import com.castlink.receiver.airplay.handshake.PlistCodec
@@ -517,13 +518,22 @@ open class RtspHandler(
     }
 
     /** GET /info — advertises receiver identity + capabilities (binary plist). */
-    private fun handleInfo(request: RtspRequest): RtspResponse = RtspResponse(
-        statusCode = 200,
-        statusMessage = "OK",
-        bodyBytes = InfoResponder.build(context, displayWidth, displayHeight, pinRequired = pinAuthEnabled),
-        contentType = "application/x-apple-binary-plist",
-        protocol = request.responseProtocol()
-    )
+    private fun handleInfo(request: RtspRequest): RtspResponse {
+        // 软解模式（本进程已确认硬解卡死、软解可用）：广播 720p，让发送端直接发
+        // 低分辨率流——1080p 软解只有约 25fps，跟不上约 30fps 的输入（v0.1.58 实测
+        // 队列积压出约 5 秒声画不同步）。/info 在每次连接开始时拉取，从下一次连接起生效。
+        val softwareMode = MirrorStreamServer.isHardwareKnownBad()
+        val w = if (softwareMode) 1280 else displayWidth
+        val h = if (softwareMode) 720 else displayHeight
+        if (softwareMode) Logger.i("AirPlay /info: software decode mode — advertising 1280x720")
+        return RtspResponse(
+            statusCode = 200,
+            statusMessage = "OK",
+            bodyBytes = InfoResponder.build(context, w, h, pinRequired = pinAuthEnabled),
+            contentType = "application/x-apple-binary-plist",
+            protocol = request.responseProtocol()
+        )
+    }
 
     /**
      * POST /pair-setup. With PIN auth off (default) this is the anonymous Ed25519 exchange. With PIN

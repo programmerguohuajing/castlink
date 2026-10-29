@@ -28,10 +28,13 @@ import java.util.concurrent.TimeUnit
  *        units (a NAL may span packets), convert to Annex-B, decode
  *
  * Architecture: a network thread reads + decrypts packets (keeping the AES-CTR keystream strictly
- * ordered) and pushes work onto a bounded queue; a separate decoder thread consumes it. This way
- * the socket is always drained fast — if the decoder can't keep up (this SoC is modest, and the
- * audio codec competes for resources), frames are dropped from the queue instead of stalling the
- * socket, which previously caused macOS to drop the whole session.
+ * ordered) and pushes work onto a bounded queue; a separate decoder thread consumes it. When the
+ * decoder can't keep up, the reader BLOCKS on the full queue (backpressure): TCP flow control
+ * throttles the sender to our consumption rate, and any frame skipping happens inside the sender's
+ * encoder, which keeps the encoded chain gapless. The old behaviour (drop the oldest queued frame)
+ * broke the reference chain — and with only one IDR per session plus a keyframe gate, a single
+ * dropped frame froze the picture forever (software decode ~25fps vs ~30fps input made the queue
+ * grow to full, drop once, then gate everything).
  *
  * Reference: RPiPlay lib/raop_rtp_mirror.c (raop_rtp_mirror_thread).
  */
@@ -80,11 +83,10 @@ class MirrorStreamServer(
     @Volatile private var framesIn = 0
     private var framesDropped = 0
     private var lastStatMs = 0L
-    // Set by the reader thread when a frame is dropped under load; the decoder thread then skips
-    // frames until the next keyframe (IDR) so it never decodes a reference-broken, corrupt stream.
-    @Volatile private var awaitingKeyframe = false
-    // 码流缺口标志（reader 线程置位、decoder 线程消费）：队列溢出丢帧、NAL 长度损坏、重组
-    // 缓冲超限都意味着流里少了东西——GOP 缓存必须作废，解码器也得等下一个 IDR。
+    // 码流缺口标志（reader 线程置位、decoder 线程消费）：NAL 长度损坏、重组缓冲超限
+    // 意味着流里少了东西——GOP 缓存必须作废（不可重放）。解码器本身不再等 IDR：
+    // 本协议整会话只有 1 个 IDR，“等关键帧”等于永久冻帧（v0.1.58 实测）；缺参考的
+    // P 帧照喂，靠解码器纠错 + 帧内刷新逐步恢复，看门狗/重放兜底。
     @Volatile private var streamBroken = false
     // 最近一个 IDR 起的全部视频块（decoder 线程专用）：解码器重建后据此重放，不依赖手机
     // 再发 IDR（见 GopCache）。
@@ -118,7 +120,7 @@ class MirrorStreamServer(
     // 卡死判据用它而不是 framesIn：framesIn 还包含被关键帧门/空解码器扣下的帧，会把
     // “没喂进去”误判成“喂了不出帧”。
     @Volatile private var decoderFed = 0
-    // 被关键帧门或空解码器扣下、没送进解码器的帧数（日志用）。
+    // 解码器为空（无 Surface/未配置）时扣下、没送进解码器的帧数（日志用）。
     @Volatile private var gatedFrames = 0
     private var firstFrameLogged = false
     // 本会话累计 IDR 数（不清零）：看门狗触发时据此判断“手机到底发没发过关键帧”。
@@ -201,14 +203,17 @@ class MirrorStreamServer(
         }
     }
 
-    /** Bounded enqueue — if the decoder is behind, drop the oldest item to keep latency bounded. */
+    /**
+     * 入队（背压）：队列满时阻塞 reader 线程，直到解码线程腾出位置——TCP 流控会把
+     * 发送端压到我们的消费速度；发送端要跳帧也是在编码前跳，码流参考链不断。
+     * 旧做法（丢最老帧）一旦丢帧就断链：软解 25fps 跟不上 30fps 输入时队列积压到
+     * 满、丢 1 帧，之后全部帧被关键帧门挡住而永久冻帧（实测）。
+     * 轮询 offer + 检查 running，保证 stop()/断线时阻塞中的 reader 能退出。
+     */
     private fun enqueue(item: Item) {
         framesIn++
-        if (!queue.offer(item)) {
-            queue.poll()
-            queue.offer(item)
-            framesDropped++
-            streamBroken = true            // a frame was lost — cache invalid, resync at the next IDR
+        while (running) {
+            if (queue.offer(item, 100, TimeUnit.MILLISECONDS)) break
         }
         StreamStats.videoQueue = queue.size
         if (framesIn % 300 == 0) {
@@ -302,7 +307,7 @@ class MirrorStreamServer(
 
     /**
      * 打印一次视频统计行。out= 是解码器真正渲染到 Surface 的帧数。各计数的关系：
-     * in（收到）= fed（送入解码器）+ gated（被关键帧门/空解码器扣下）+ 队列丢帧(dropped)；
+     * in（收到）= fed（送入解码器）+ gated（空解码器扣下）+ dropped（背压后队列不再丢帧，恒 0）；
      * fed 涨而 out 不涨 = 解码器吃进去不出帧；in 涨而 fed 不涨 = 帧被扣在门外（看 gated）。
      * pend= 重组缓冲残留；surf= 当前 Surface 是否存活（若已死，例如用户切到了日志页，
      * out 不涨是预期行为而非解码器故障）；gop= 可重放缓存的块数。
@@ -335,7 +340,7 @@ class MirrorStreamServer(
             for (k in 0 until ls) len = (len shl 8) or (buf[i + k].toInt() and 0xFF)
             if (len <= 0 || len > MAX_PAYLOAD) {
                 Logger.w("Mirror: bad NAL length $len (lenSize=$ls) — dropping ${buf.size}B " +
-                    "pending, awaiting keyframe")
+                    "pending, stream marked broken")
                 pendingAvcc.reset()
                 streamBroken = true
                 return out.toByteArray()
@@ -350,7 +355,7 @@ class MirrorStreamServer(
         if (i < buf.size) pendingAvcc.write(buf, i, buf.size - i)
         if (pendingAvcc.size() > MAX_PAYLOAD) {
             Logger.w("Mirror: pending NAL never completed (${pendingAvcc.size()}B) — dropping, " +
-                "awaiting keyframe")
+                "stream marked broken")
             pendingAvcc.reset()
             streamBroken = true
         }
@@ -421,8 +426,8 @@ class MirrorStreamServer(
      * change (app background→foreground): releases the old decoder and resyncs.
      *
      * 重新同步方式：GOP 缓存可用（有 IDR 起的完整无缺口序列）时，把缓存按序**重放**给新解码器，
-     * 立即恢复到当前画面，不需要手机再发 IDR；否则才退回“等下一个 IDR”（awaitingKeyframe）。
-     * iPhone 整个会话只发 1 个 IDR，所以后者在实际中等于永久冻帧——只在确实没有缓存时才走。
+     * 立即恢复到当前画面，不需要手机再发 IDR；无缓存时直播帧直喂新解码器（无关键帧门，
+     * 见 decodeFrame）——iPhone 整个会话只发 1 个 IDR，“等 IDR”等于永久冻帧。
      * If the surface or config isn't available yet, leaves the decoder null and retries on a later
      * frame (frames are dropped until then).
      */
@@ -459,15 +464,15 @@ class MirrorStreamServer(
             "codec=${nd.codecName} software=$useSoftwareDecoder)")
         if (gop.canReplay()) {
             replayGop(nd)
-        } else {
-            awaitingKeyframe = true                            // no cache: must wait for an IDR
         }
+        // 无缓存可重放时也不等 IDR：新解码器直接吃直播 P 帧（画面先花，靠帧内刷新
+        // 逐步恢复），好过永久冻帧——本协议整会话只有 1 个 IDR 可等。
     }
 
     /**
      * 把 GOP 缓存（IDR 起的全部块）按序喂给新解码器。decoder 线程内同步完成；期间 reader 线程
-     * 继续把新帧排进队列（队列容量留有余量），重放结束后再接着消费——顺序不乱、无缺口。
-     * 任何一块被解码器拒收则放弃重放，退回等下一个 IDR。
+     * 在队列满时阻塞等待（背压），重放结束后再接着消费——顺序不乱、无缺口。
+     * 任何一块被解码器拒收则放弃重放并作废缓存（直播帧照常喂，无关键帧门）。
      */
     private fun replayGop(d: VideoDecoder) {
         val frames = gop.snapshot()
@@ -475,15 +480,13 @@ class MirrorStreamServer(
         for (blob in frames) {
             if (!running) return
             if (!d.decodeNalUnit(blob, nextPtsUs())) {
-                Logger.w("Mirror: GOP replay aborted at $fed/${frames.size} (decoder rejected input) — awaiting keyframe")
+                Logger.w("Mirror: GOP replay aborted at $fed/${frames.size} (decoder rejected input)")
                 gop.invalidate()
-                awaitingKeyframe = true
                 return
             }
             decoderFed++
             fed++
         }
-        awaitingKeyframe = false
         lastOutAdvanceMs = System.currentTimeMillis()          // 重放耗时不算“无输出”
         Logger.i("Mirror: replayed $fed cached frames (${gop.byteCount}B) from the last IDR into the new decoder")
     }
@@ -498,11 +501,10 @@ class MirrorStreamServer(
     }
 
     private fun decodeFrame(annexB: ByteArray) {
-        // 码流缺口（reader 线程丢帧/损坏）：缓存作废；解码器等下一个 IDR 重新同步。
+        // 码流缺口（NAL 损坏/重组超限）：缓存作废（不可重放）；解码器不设门限，照常喂。
         if (streamBroken) {
             streamBroken = false
             gop.invalidate()
-            awaitingKeyframe = true
         }
         // Re-attach to the live Surface if it changed (the app was backgrounded and returned, so the
         // SurfaceView made a new Surface). Without this, video stays black after foregrounding.
@@ -579,13 +581,7 @@ class MirrorStreamServer(
             }
             return
         }
-        if (awaitingKeyframe) {
-            // 解码器和码流之间有缺口（新解码器没缓存可重放、或码流丢过帧）：跳到下一个 IDR，
-            // 不把缺参考帧的 P 帧喂进去（会花屏/静默不出帧）。
-            if (!key) { gatedFrames++; return }
-            awaitingKeyframe = false
-            Logger.i("Mirror: resynced on keyframe")
-        }
+        // 注意：这里刻意没有“等关键帧”门限——缺参考的 P 帧也照喂（见 streamBroken 注释）。
         if (!firstFrameLogged) {
             firstFrameLogged = true
             Logger.i("Mirror: first video frame fed to decoder (${annexB.size}B)")
@@ -594,15 +590,14 @@ class MirrorStreamServer(
             decoderFed++
         } else {
             // 解码器丢了这一帧（输入缓冲超限/超时/异常）：参考链断了。缓存里有完整序列（含这一帧）
-            // 时直接重建并重放恢复；否则才等下一个 IDR。冷却期内退回等 IDR，避免反复重建。
+            // 时直接重建并重放恢复；否则继续喂后续帧（无关键帧门，靠纠错/帧内刷新
+            // 逐步恢复），不再等一个整会话都不会再来的 IDR。
             decoderDropped++
             val now = System.currentTimeMillis()
             if (gop.canReplay() && now - lastWatchdogRecreateMs > STALL_RECREATE_COOLDOWN_MS) {
                 lastWatchdogRecreateMs = now
                 Logger.w("Mirror: decoder dropped a frame — rebuilding and replaying the GOP")
                 rebuildDecoder(liveSurface)
-            } else {
-                awaitingKeyframe = true
             }
         }
     }
@@ -746,9 +741,9 @@ class MirrorStreamServer(
 
     companion object {
         private const val MAX_PAYLOAD = 8 * 1024 * 1024        // 8 MB sanity cap per frame
-        // 150：给“解码器重放 GOP 缓存”期间 reader 继续入队留余量（24fps 约 6 秒），
-        // 满了才丢最老项并标记码流缺口。
-        private const val QUEUE_CAPACITY = 150
+        // 30（30fps 约 1 秒）：背压下队列深度就是画面延迟上限——150 时软解积压出约
+        // 5 秒声画不同步。重放期间 reader 阻塞等待即可，不再需要大余量。
+        private const val QUEUE_CAPACITY = 30
         private const val STALL_GAP_FED = 30                   // 看门狗：已喂入却未输出的帧数阈值
         private const val STALL_QUIET_MS = 1500L               // 看门狗：out 纹丝不动的时长阈值
         private const val STALL_RECREATE_COOLDOWN_MS = 5000L   // 看门狗/丢帧重建冷却（见 checkStallWatchdog）
@@ -760,5 +755,8 @@ class MirrorStreamServer(
         // 进程内记忆：本进程里已确认“硬解卡死、软解能出帧”后，后续会话直接用软解，免得每次
         // 先卡 2–3 秒再切换。进程重启后重新探测。
         @Volatile private var hardwareKnownBad = false
+
+        /** 本进程是否已确认“硬解卡死、软解可用”——RtspHandler 的 /info 据此广播 720p。 */
+        fun isHardwareKnownBad(): Boolean = hardwareKnownBad
     }
 }
