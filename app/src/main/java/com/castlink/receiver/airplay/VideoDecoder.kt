@@ -67,6 +67,26 @@ class VideoDecoder(
     var framesOut = 0L
         private set
 
+    /** 实际选中的解码器名（日志诊断用：区分硬解/软解）；未初始化或已释放时返回 "-"。 */
+    val codecName: String
+        get() = try { mediaCodec?.name ?: "-" } catch (e: Exception) { "-" }
+
+    /**
+     * 只排空解码器已完成的输出并渲染，不喂输入。输入稀少（静态画面）时，解码器里可能
+     * 还压着最后几帧；解码线程空闲时调用它，保证它们及时上屏。
+     */
+    fun drainOutput() {
+        val c = mediaCodec ?: return
+        try {
+            releaseOutputBuffers(c)
+        } catch (e: IllegalStateException) {
+            Logger.e("VideoDecoder entered error state while draining — will recreate", e)
+            isHealthy = false
+        } catch (e: Exception) {
+            Logger.e("Error draining decoder output", e)
+        }
+    }
+
     /**
      * Initializes the MediaCodec decoder with the video stream parameters from the SDP.
      *
