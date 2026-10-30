@@ -1,1 +1,1 @@
-{"_comment":"CastLink OTA","apkUrl":"https://github.com/programmerguohuajing/castlink/releases/download/v0.1.62/CastLink-v0.1.62.apk","changelog":"v0.1.62\n- 硬解不行持久化：重启后第一次连接就走软解+720p，声画同步改善","versionCode":83,"versionName":"0.1.62"}
+{"_comment":"CastLink OTA","apkUrl":"https://github.com/programmerguohuajing/castlink/releases/download/v0.1.64/CastLink-v0.1.64.apk","changelog":"v0.1.64\n- 声画同步：SPS 低延迟声明 + 时间戳实测对齐、音频自动延后\n- 设置新增声画微调","versionCode":85,"versionName":"0.1.64"}
