@@ -39,6 +39,8 @@ object StreamStats {
     // 让声音和落后的画面对齐（见 AudioDelayLine）。MirrorStreamServer 写，AudioStreamServer 读。
     @Volatile var videoLatencyMs = 0
     @Volatile var audioDelayMs = 0L    // 音频当前实际延后量（日志/HUD 用）
+    // 用户在设置里的声画微调（毫秒，>0 = 声音再延后）。TV 自身的显示处理延迟测不出来，留个手动旋钮。
+    @Volatile var avTrimMs = 0
 
     /** Clears per-stream counters (call when a mirror session ends). Keeps [overlayEnabled]. */
     fun resetStreams() {

@@ -135,6 +135,16 @@ class SettingsActivity : BaseActivity() {
         }
     }
 
+    private fun updateTrimStyle(button: Button, active: Boolean) {
+        if (active) {
+            button.setBackgroundResource(R.drawable.bg_toggle_pill_on)
+            button.setTextColor(getColor(R.color.nebula_cyan))
+        } else {
+            button.setBackgroundResource(R.drawable.bg_toggle_pill_off)
+            button.setTextColor(getColor(R.color.nebula_text_2ry))
+        }
+    }
+
     /**
      * 手动 D-pad 焦点链。按布局从上到下顺序，UP/DOWN 移动焦点，
      * CENTER/ENTER 触发点击。
@@ -155,6 +165,7 @@ class SettingsActivity : BaseActivity() {
             },
             findViewById(R.id.row_legacy_mode),
             findViewById(R.id.row_skip_pair_verify),
+            findViewById(R.id.row_av_trim),
             findViewById(R.id.btn_clear_pairings),
             findViewById(R.id.row_language),
             findViewById(R.id.sp_update_mirror),
@@ -214,6 +225,26 @@ class SettingsActivity : BaseActivity() {
         }
         btnSkip.setOnClickListener { toggleSkip() }
         findViewById<View>(R.id.row_skip_pair_verify)?.setOnClickListener { toggleSkip() }
+
+        // 声画微调：-300 … +500 ms，每次点击进一档（100ms），到头回到 -300。
+        val btnTrim = findViewById<Button>(R.id.btn_av_trim)
+        val trimSteps = intArrayOf(-300, -200, -100, 0, 100, 200, 300, 400, 500)
+        fun refreshTrim() {
+            val v = airPlayPrefs.avTrimMs
+            btnTrim.text = (if (v > 0) "+$v" else "$v") + " ms"
+            updateTrimStyle(btnTrim, v != 0)
+        }
+        refreshTrim()
+        val cycleTrim = {
+            val cur = airPlayPrefs.avTrimMs
+            val idx = trimSteps.indexOfFirst { it > cur }
+            val next = if (idx < 0) trimSteps.first() else trimSteps[idx]
+            airPlayPrefs.avTrimMs = next
+            com.castlink.receiver.airplay.StreamStats.avTrimMs = next   // 同进程，立即生效
+            refreshTrim()
+        }
+        btnTrim.setOnClickListener { cycleTrim() }
+        findViewById<View>(R.id.row_av_trim)?.setOnClickListener { cycleTrim() }
 
         findViewById<Button>(R.id.btn_clear_pairings).setOnClickListener {
             getSharedPreferences("castlink_pairings", MODE_PRIVATE).edit().clear().apply()

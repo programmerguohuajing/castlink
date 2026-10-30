@@ -50,7 +50,7 @@ class MirrorStreamServer(
 ) {
     private sealed class Item
     private class Config(val sps: ByteArray, val pps: ByteArray) : Item()
-    private class Frame(val annexB: ByteArray) : Item()
+    private class Frame(val annexB: ByteArray, val mediaUs: Long = -1L) : Item()
 
     private val cipher = MirrorCrypto.streamCipher(aesKey, ecdhSecret, streamConnectionId)
     // AVCC 重组缓冲（仅 reader 线程使用）：一个 NAL 单元可能被拆到多个 type-0 包里
@@ -75,6 +75,12 @@ class MirrorStreamServer(
     private var spsPatchSrc: ByteArray? = null
     private var spsPatched: ByteArray? = null
     // 画面管线延迟估计（decoder 线程）：out 吞吐 + 队列/解码器内帧数 → 毫秒，给音频延后用。
+    // 喂入解码器的 PTS → iPhone 媒体时间（µs），渲染时据此反查测声画偏差（decoder 线程专用）。
+    private val ptsToMedia = object : LinkedHashMap<Long, Long>(256, 0.75f, false) {
+        override fun removeEldestEntry(e: MutableMap.MutableEntry<Long, Long>?) = size > 512
+    }
+    private var lastReportedPts = -1L
+    private var videoTsLogged = 0
     private var latLastMs = 0L
     private var latLastOut = 0L
     private var outRateFps = 0f
@@ -156,6 +162,7 @@ class MirrorStreamServer(
 
     fun start(scope: CoroutineScope) {
         running = true
+        AvSync.reset()
         scope.launch(Dispatchers.IO) { runReader() }
         scope.launch(Dispatchers.IO) { runDecoder() }
     }
@@ -165,6 +172,7 @@ class MirrorStreamServer(
         runCatching { client?.close() }
         runCatching { serverSocket.close() }
         queue.clear()
+        AvSync.reset()
         StreamStats.videoLatencyMs = 0          // 画面没了：音频不再延后
         Logger.i("MirrorStreamServer stopped")
     }
@@ -193,7 +201,15 @@ class MirrorStreamServer(
                         // skipping any packet desyncs the keystream and corrupts all later frames.
                         // 解密后不直接转 Annex-B：先经重组缓冲拼出完整 NAL（见 pendingAvcc 注释）。
                         val annexB = extractCompleteNals(cipher.update(payload))
-                        if (annexB.isNotEmpty()) enqueue(Frame(annexB))
+                        if (annexB.isNotEmpty()) {
+                            // 包头 bytes 8..15（小端）= iPhone 打的采集时刻（NTP 格式）。
+                            val mediaUs = ntpToUs(leLong(header, 8))
+                            if (videoTsLogged < 3) {
+                                videoTsLogged++
+                                Logger.i("Mirror: video frame #$videoTsLogged media ts = ${mediaUs}us (raw ${"%016x".format(leLong(header, 8))})")
+                            }
+                            enqueue(Frame(annexB, mediaUs))
+                        }
                     }
                     1 -> parseConfig(payload)?.let { enqueue(it) }
                     else -> {
@@ -268,6 +284,7 @@ class MirrorStreamServer(
         }
         val out = d.framesOut
         updatePipelineLatency(now, out)
+        reportRenderedFrame(d)
         if (out != lastWatchdogOut) {
             lastWatchdogOut = out
             lastOutAdvanceMs = now
@@ -410,7 +427,7 @@ class MirrorStreamServer(
                 }
                 when (item) {
                     is Config -> configureDecoder(item.sps, item.pps)
-                    is Frame -> decodeFrame(item.annexB)
+                    is Frame -> decodeFrame(item.annexB, item.mediaUs)
                 }
             }
         } catch (e: Exception) {
@@ -556,6 +573,17 @@ class MirrorStreamServer(
         StreamStats.videoLatencyMs = latencyEmaMs.toInt()
     }
 
+    private fun rememberPts(pts: Long, mediaUs: Long) { ptsToMedia[pts] = mediaUs }
+
+    /** 把解码器最新渲染的帧报给 AvSync（用渲染时刻 − 该帧媒体时间 = 画面落后量）。 */
+    private fun reportRenderedFrame(d: VideoDecoder) {
+        val p = d.lastOutPtsUs
+        if (p < 0 || p == lastReportedPts) return
+        lastReportedPts = p
+        val media = ptsToMedia[p] ?: return                // 重放帧没有媒体时间，跳过
+        AvSync.onVideoRendered(media, d.lastOutLocalNs / 1000)
+    }
+
     private fun nextPtsUs(): Long {
         val nowNs = System.nanoTime()
         if (ptsBaseNs == 0L) ptsBaseNs = nowNs
@@ -564,7 +592,7 @@ class MirrorStreamServer(
         return lastPtsUs
     }
 
-    private fun decodeFrame(annexB: ByteArray) {
+    private fun decodeFrame(annexB: ByteArray, mediaUs: Long = -1L) {
         // 码流缺口（NAL 损坏/重组超限）：缓存作废（不可重放）；解码器不设门限，照常喂。
         if (streamBroken) {
             streamBroken = false
@@ -650,7 +678,9 @@ class MirrorStreamServer(
             firstFrameLogged = true
             Logger.i("Mirror: first video frame fed to decoder (${annexB.size}B)")
         }
-        if (d.decodeNalUnit(feedBlob, nextPtsUs())) {
+        val feedPts = nextPtsUs()
+        if (mediaUs >= 0) rememberPts(feedPts, mediaUs)
+        if (d.decodeNalUnit(feedBlob, feedPts)) {
             decoderFed++
         } else {
             // 解码器丢了这一帧（输入缓冲超限/超时/异常）：参考链断了。缓存里有完整序列（含这一帧）
@@ -799,6 +829,16 @@ class MirrorStreamServer(
     private fun leInt(b: ByteArray, off: Int): Int =
         (b[off].toInt() and 0xFF) or ((b[off + 1].toInt() and 0xFF) shl 8) or
             ((b[off + 2].toInt() and 0xFF) shl 16) or ((b[off + 3].toInt() and 0xFF) shl 24)
+
+    private fun leLong(b: ByteArray, off: Int): Long =
+        (leInt(b, off).toLong() and 0xFFFFFFFFL) or ((leInt(b, off + 4).toLong() and 0xFFFFFFFFL) shl 32)
+
+    /** NTP 64 位定点（高 32 位秒、低 32 位小数）→ 微秒。 */
+    private fun ntpToUs(raw: Long): Long {
+        val sec = (raw ushr 32) and 0xFFFFFFFFL
+        val frac = raw and 0xFFFFFFFFL
+        return sec * 1_000_000L + ((frac * 1_000_000L) ushr 32)
+    }
 
     private fun leShort(b: ByteArray, off: Int): Int =
         (b[off].toInt() and 0xFF) or ((b[off + 1].toInt() and 0xFF) shl 8)

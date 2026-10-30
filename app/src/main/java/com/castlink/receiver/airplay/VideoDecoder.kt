@@ -67,6 +67,12 @@ class VideoDecoder(
     var framesOut = 0L
         private set
 
+    /** 最近一次渲染的帧的 PTS 与渲染时刻（System.nanoTime），供声画偏差测量（见 AvSync）。 */
+    @Volatile var lastOutPtsUs = -1L
+        private set
+    @Volatile var lastOutLocalNs = 0L
+        private set
+
     /** 实际选中的解码器名（日志诊断用：区分硬解/软解）；未初始化或已释放时返回 "-"。 */
     val codecName: String
         get() = try { mediaCodec?.name ?: "-" } catch (e: Exception) { "-" }
@@ -323,6 +329,8 @@ class VideoDecoder(
                 // decoder → the upstream frame queue saturates → big latency + dropped (corrupt) frames.
                 // A/V alignment is handled by keeping the AUDIO path low-latency instead (AudioStreamServer).
                 codec.releaseOutputBuffer(outputBufferIndex, true)
+                lastOutPtsUs = bufferInfo.presentationTimeUs
+                lastOutLocalNs = System.nanoTime()
                 framesOut++
             }
             outputBufferIndex = codec.dequeueOutputBuffer(bufferInfo, 0)

@@ -18,8 +18,14 @@ class AirPlayPrefs(context: Context) {
         get() = prefs.getBoolean(KEY_SKIP_PAIR_VERIFY, false)
         set(v) = prefs.edit().putBoolean(KEY_SKIP_PAIR_VERIFY, v).apply()
 
+    /** 声画微调（毫秒）：>0 声音再延后，<0 声音提前（画面落后时通常要 >0）。默认 0。 */
+    var avTrimMs: Int
+        get() = prefs.getInt(KEY_AV_TRIM_MS, 0)
+        set(v) = prefs.edit().putInt(KEY_AV_TRIM_MS, v).apply()
+
     companion object {
         private const val PREFS = "castlink_airplay"
+        private const val KEY_AV_TRIM_MS = "av_trim_ms"
         private const val KEY_SKIP_PAIR_VERIFY = "skip_pair_verify"
     }
 }

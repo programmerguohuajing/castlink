@@ -58,6 +58,8 @@
     <string name="setting_airplay_title">AirPlay 配对</string>
     <string name="setting_skip_pair_verify">可信局域网：跳过配对校验</string>
     <string name="setting_skip_pair_verify_desc">仅在自家可信网络开启。配对缓存损坏导致连接失败时的逃生开关。</string>
+    <string name="setting_av_trim">声画微调（声音延后）</string>
+    <string name="setting_av_trim_desc">已按时间戳自动对齐声画；电视自身的画面处理延迟测不出来，仍觉得声音早于画面就调大，声音晚于画面就调小。</string>
     <string name="btn_clear_pairings">清除已配对设备</string>
     <string name="pairings_cleared">已配对设备已清除，下次连接需重新输入 PIN</string>
     <string name="update_check_failed">检查失败：%1$s</string>

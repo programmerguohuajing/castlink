@@ -152,6 +152,7 @@ class AirPlayReceiver(
      */
     fun start() {
         Logger.i("AirPlayReceiver starting (displayName='$displayName')")
+        StreamStats.avTrimMs = AirPlayPrefs(context).avTrimMs     // 声画微调（设置里调）
         // 回填“本机硬解不行”的持久化标记（以往运行确认过）：/info 据此从第一次连接
         // 就广播 720p、新会话直用软解，不必每个进程都先楔一次硬解 + 跑一段 1080p 软解。
         if (context.getSharedPreferences(PREFS_FILE, Context.MODE_PRIVATE)

@@ -78,7 +78,9 @@ class AudioStreamServer(
     // Decoded-audio jitter buffer: raw (post-dedup) RTP payloads handed from the receive thread to
     // the playback thread. Bounded so a stalled player can't grow latency unboundedly — if it fills
     // we drop the oldest frame (a brief glitch is better than ever-growing audio lag).
-    private val frameQueue = ArrayBlockingQueue<ByteArray>(AUDIO_QUEUE_CAPACITY)
+    // 带着 RTP 时间戳一起走：声画对齐要用它换算媒体时间（见 AvSync）。
+    private class AudioPkt(val payload: ByteArray, val rtp: Long)
+    private val frameQueue = ArrayBlockingQueue<AudioPkt>(AUDIO_QUEUE_CAPACITY)
 
     // RTP duplicate suppression. macOS sends each realtime-audio packet 2–3× for redundancy
     // (same 16-bit sequence number). Decoding every copy feeds the AAC decoder duplicate frames
@@ -98,7 +100,7 @@ class AudioStreamServer(
     // threads (resend replies), so all access is under [reorderLock].
     private val reorderLock = Any()
     private val sendLock = Any()                       // serialises control-socket resend sends
-    private val reorder = HashMap<Int, ByteArray>()   // seq → decrypted-pending RTP payload
+    private val reorder = HashMap<Int, AudioPkt>()   // seq → pending RTP payload (+ its RTP timestamp)
     private var nextSeq = -1                            // next seq to release in order (-1 = uninit)
     private var maxSeq = -1                             // highest seq seen (for gap detection)
     private var resendCtr = 0                           // sequence counter for our resend requests
@@ -143,6 +145,17 @@ class AudioStreamServer(
                 }
                 // RTP payload type is bits 0–6 of byte 1 (byte 1 = marker<<7 | type).
                 val payloadType = pkt.data[1].toInt() and 0x7F
+                if (payloadType == RTP_TYPE_SYNC && pkt.length >= 20) {
+                    // 同步包：bytes 8..15 = NTP 时刻（iPhone 时钟，秒.小数，大端），bytes 16..19 = 该时刻的
+                    // RTP 时间戳。据此把任意 RTP 时间戳换算成媒体时间（与视频帧时间戳同一时钟）。
+                    val d = pkt.data
+                    val ntpUs = (be32(d, 8) * 1_000_000L) + ((be32(d, 12) * 1_000_000L) ushr 32)
+                    AvSync.setAudioMap(be32(d, 16), ntpUs, sampleRate)
+                    if (syncLogged < 3) {
+                        syncLogged++
+                        Logger.i("Audio sync #$syncLogged: rtp=${be32(d, 16)} ntp=${ntpUs}us (rtp-less-latency=${be32(d, 4)})")
+                    }
+                }
                 if (payloadType == RTP_TYPE_RESEND_REPLY && pkt.length > RESEND_REPLY_HEADER + RTP_HEADER) {
                     // bytes [4..] are the original audio RTP packet — feed it through the normal path.
                     resendFillCount++
@@ -205,10 +218,11 @@ class AudioStreamServer(
         val seq = ((src[offset + 2].toInt() and 0xFF) shl 8) or (src[offset + 3].toInt() and 0xFF)
         // RAOP RTP: 12-byte header, then AES-128-CBC-encrypted audio payload (copied out of src).
         val payload = src.copyOfRange(offset + RTP_HEADER, offset + length)
+        val rtpTs = be32(src, offset + 4)
         var resend: IntArray? = null
         synchronized(reorderLock) {
             if (isDuplicateSeq(seq)) { dupCount++; return }
-            resend = enqueueInOrder(seq, payload)
+            resend = enqueueInOrder(seq, AudioPkt(payload, rtpTs))
         }
         // Send the resend request OUTSIDE the reorder lock — never hold it across socket I/O.
         resend?.let { requestResend(it[0], it[1]) }
@@ -218,7 +232,7 @@ class AudioStreamServer(
      * Inserts [seq]/[payload] into the reorder buffer and releases all now-contiguous packets to the
      * player in order. Returns the [startSeq, count] of a missing range to resend (or null). Under [reorderLock].
      */
-    private fun enqueueInOrder(seq: Int, payload: ByteArray): IntArray? {
+    private fun enqueueInOrder(seq: Int, payload: AudioPkt): IntArray? {
         if (nextSeq < 0) { nextSeq = seq; maxSeq = seq }      // first packet anchors the stream
         // Ignore packets older than what we've already released (a late resend we gave up on).
         if (seqDiff(seq, nextSeq) < 0) return null
@@ -281,11 +295,17 @@ class AudioStreamServer(
         try {
             initDecoder()
             initAudioTrack()
+            // 解码器/AudioTrack 初始化期间 reader 一直在往队列里灌：这些“过时”的音频若照放，声音就永久比画面
+            // 晚一个初始化耗时（队列容量 ~1s，实时汇点追不上）。开播前只留最后几帧。
+            var stale = 0
+            while (frameQueue.size > STARTUP_KEEP_FRAMES && frameQueue.poll() != null) stale++
+            if (stale > 0) { qDropCount += stale; Logger.i("Audio: dropped $stale stale frames queued during init (kept ${frameQueue.size})") }
             while (running) {
                 val payload = frameQueue.poll(200, TimeUnit.MILLISECONDS)
                 if (payload == null) { flushDelayed(); continue }   // 没新帧时也要放出延后队列里到点的音频
                 try {
-                    val decrypted = decryptPacket(payload)
+                    curRtp = payload.rtp
+                    val decrypted = decryptPacket(payload.payload)
                     if (alac != null) playAlacFrame(decrypted) else decodeFrame(decrypted)
                 } catch (e: Exception) {
                     if (running) Logger.e("Audio: frame decode error", e)
@@ -314,29 +334,94 @@ class AudioStreamServer(
         writePcm(pcm)
     }
 
-    // 音画同步：画面管线有几百毫秒延迟时，音频延后同样的量（见 AudioDelayLine）。仅播放线程使用。
+    // ─── 声画同步（见 AvSync / AvSyncController / AudioDelayLine）。仅播放线程使用。───
     private val delayLine = AudioDelayLine()
+    private val syncController = AvSyncController(framesPerPacketMs())
+    private var curRtp = 0L                    // 正在解码/播放的这一包的 RTP 时间戳
+    private var framesWritten = 0L             // 已写入 AudioTrack 的 PCM 帧数（算缓冲了多久）
+    private var syncLogged = 0
+    private var lastSyncLogMs = 0L
+
+    private fun framesPerPacketMs(): Double =
+        (if (framesPerPacket > 0) framesPerPacket else 480) * 1000.0 / sampleRate
 
     private fun writePcm(pcm: ByteArray) {
         val track = audioTrack ?: return
-        // 目标延迟 = 视频侧实测的画面管线延迟；无画面（纯音频）时为 0，行为与以前完全一致。
-        if (delayLine.retarget(StreamStats.videoLatencyMs.toLong())) {
-            StreamStats.audioDelayMs = delayLine.delayMs
-            Logger.i("Audio: A/V sync — audio delayed ${delayLine.delayMs}ms to match video latency " +
-                "${StreamStats.videoLatencyMs}ms (dropped=${delayLine.droppedChunks})")
-        }
+        runSyncControl(track)
         if (delayLine.delayMs == 0L && delayLine.isEmpty) {
-            track.write(pcm, 0, pcm.size, AudioTrack.WRITE_BLOCKING)
+            playout(track, pcm, curRtp)
             return
         }
-        delayLine.offer(pcm)
-        delayLine.drainDue { track.write(it, 0, it.size, AudioTrack.WRITE_BLOCKING) }
+        delayLine.offer(pcm, curRtp)
+        delayLine.drainDue { p, rtp -> playout(track, p, rtp) }
     }
 
     private fun flushDelayed() {
         val track = audioTrack ?: return
+        runSyncControl(track)
         if (delayLine.isEmpty) return
-        delayLine.drainDue { track.write(it, 0, it.size, AudioTrack.WRITE_BLOCKING) }
+        delayLine.drainDue { p, rtp -> playout(track, p, rtp) }
+    }
+
+    /** 真正写 AudioTrack，并记录这块音频“实际播出时刻 − 媒体时间”（AudioTrack 里已缓冲的也算）。 */
+    private fun playout(track: AudioTrack, pcm: ByteArray, rtp: Long) {
+        val bytesPerFrame = channels * 2
+        val media = AvSync.audioMediaUs(rtp)
+        if (media != null) AvSync.onAudioPlayout(media, playoutLocalUs(track, framesWritten))
+        track.write(pcm, 0, pcm.size, AudioTrack.WRITE_BLOCKING)
+        framesWritten += pcm.size / bytesPerFrame
+    }
+
+    private val audioTs = android.media.AudioTimestamp()
+
+    /**
+     * 第 [frameIndex] 帧（本次 AudioTrack 起算的累计帧序号）真正从喇叭出声的本机时刻（µs，nanoTime 时基）。
+     * 优先用 AudioTrack.getTimestamp：它给出“某帧在某时刻已被输出”，包含 AudioFlinger/HAL 自身的
+     * 输出延迟（TV 上可能上百毫秒，只数缓冲区会漏掉）。拿不到（刚启动/欠载）时退回播放头位置，
+     * 只算缓冲区里排在前面的帧。
+     */
+    private fun playoutLocalUs(track: AudioTrack, frameIndex: Long): Long {
+        val nowUs = System.nanoTime() / 1000
+        if (track.getTimestamp(audioTs)) {
+            val tsUs = audioTs.nanoTime / 1000
+            val remainingUs = (frameIndex - audioTs.framePosition) * 1_000_000L / sampleRate - (nowUs - tsUs)
+            if (remainingUs > -1_000_000L && remainingUs < 3_000_000L) return nowUs + maxOf(remainingUs, 0L)
+        }
+        val head = track.playbackHeadPosition.toLong() and 0xFFFFFFFFL
+        val buffered = ((frameIndex and 0xFFFFFFFFL) - head) and 0xFFFFFFFFL
+        val bufferedUs = if (buffered <= sampleRate.toLong()) buffered * 1_000_000L / sampleRate else 0L
+        return nowUs + bufferedUs
+    }
+
+    /** 每 ~500ms 评估一次：按实测声画偏差调整音频延后量 / 丢帧追赶（见 AvSyncController）。 */
+    private fun runSyncControl(track: AudioTrack) {
+        val now = System.currentTimeMillis()
+        // 手动微调叠加到实测偏差上：trim>0 = 希望声音比“严格对齐”再晚 trim 毫秒。
+        val rawSkew = AvSync.skewMs()
+        val skewEff = rawSkew?.plus(StreamStats.avTrimMs)
+        val d = syncController.decide(now, skewEff, delayLine.delayMs, frameQueue.size, StreamStats.videoLatencyMs)
+        if (d.newDelayMs != null && d.newDelayMs != delayLine.delayMs) {
+            val skew = rawSkew
+            if (delayLine.retarget(d.newDelayMs)) {
+                StreamStats.audioDelayMs = delayLine.delayMs
+                AvSync.resetAudioSamples()                  // 旧样本不再代表现状，等新样本再评估
+                Logger.i("Audio: A/V sync — audio delay -> ${delayLine.delayMs}ms (skew=${skew?.let { "%.0f".format(it) } ?: "n/a"}ms, " +
+                    "pipeline est ${StreamStats.videoLatencyMs}ms, dropped=${delayLine.droppedChunks}) ${AvSync.snapshot()}")
+            }
+        }
+        if (d.dropFrames > 0) {
+            var n = 0
+            while (n < d.dropFrames && frameQueue.poll() != null) n++
+            if (n > 0) {
+                qDropCount += n
+                AvSync.resetAudioSamples()
+                Logger.i("Audio: A/V sync — audio ran late, skipped $n queued frames to catch up (queue now ${frameQueue.size})")
+            }
+        }
+        if (now - lastSyncLogMs > 5000) {
+            lastSyncLogMs = now
+            Logger.i("Audio sync: delay=${delayLine.delayMs}ms queue=${frameQueue.size} ${AvSync.snapshot()}")
+        }
     }
 
     /** True if this RTP sequence was already processed (a redundant retransmission). */
@@ -456,6 +541,11 @@ class AudioStreamServer(
         private const val DEFAULT_ALAC_FRAMES = 352
 
         private const val RTP_HEADER = 12
+        private const val RTP_TYPE_SYNC = 0x54            // sender → us: RTP↔NTP 同步包（marker 置位后字节为 0xD4）
+
+        private fun be32(b: ByteArray, off: Int): Long =
+            ((b[off].toLong() and 0xFF) shl 24) or ((b[off + 1].toLong() and 0xFF) shl 16) or
+                ((b[off + 2].toLong() and 0xFF) shl 8) or (b[off + 3].toLong() and 0xFF)
 
         // RAOP control-channel RTP payload types for packet-loss recovery.
         private const val RTP_TYPE_RESEND_REQUEST = 0x55   // we → sender: "resend these seqs"
@@ -471,6 +561,7 @@ class AudioStreamServer(
 
         // Jitter buffer depth between the receive and playback threads (~1 s at 92 frames/s).
         private const val AUDIO_QUEUE_CAPACITY = 96
+        private const val STARTUP_KEEP_FRAMES = 3
 
         // Sliding window of recently-played RTP sequence numbers for duplicate suppression.
         // ~11 s at 92 packets/s — far longer than any retransmit gap, far shorter than the

@@ -58,6 +58,8 @@
     <string name="setting_airplay_title">AirPlay Pairing</string>
     <string name="setting_skip_pair_verify">Trusted LAN: skip pair verification</string>
     <string name="setting_skip_pair_verify_desc">Only for your own trusted network. Escape hatch when corrupted pairing cache breaks connections.</string>
+    <string name="setting_av_trim">A/V fine-tune (delay audio)</string>
+    <string name="setting_av_trim_desc">Audio and video are aligned automatically from timestamps; your TV\'s own picture-processing delay cannot be measured. Raise it if sound leads the picture, lower it if sound lags.</string>
     <string name="btn_clear_pairings">Clear paired devices</string>
     <string name="pairings_cleared">Paired devices cleared — PIN required on next connection</string>
     <string name="update_check_failed">Check failed: %1$s</string>

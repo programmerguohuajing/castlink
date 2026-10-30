@@ -18,7 +18,7 @@ import kotlin.math.abs
  */
 internal class AudioDelayLine(private val nowMs: () -> Long = { System.currentTimeMillis() }) {
 
-    private class Chunk(val pcm: ByteArray, val atMs: Long)
+    private class Chunk(val pcm: ByteArray, val atMs: Long, val tag: Long)
 
     private val q = ArrayDeque<Chunk>()
 
@@ -38,16 +38,32 @@ internal class AudioDelayLine(private val nowMs: () -> Long = { System.currentTi
         val t = targetMs.coerceIn(0L, MAX_DELAY_MS).let { if (it < RETARGET_MIN_MS) 0L else it }
         if (t == delayMs) return false
         if (t != 0L && abs(t - delayMs) < RETARGET_MIN_MS) return false
+        val shrinking = t < delayMs
         delayMs = t
+        // 减小延迟时必须当场把多出来的那段丢掉：下游 AudioTrack 是实时汇点，提前“放出”的块并不会
+        // 播得更快，只会排在缓冲里，实际延迟降不下来（否则宽限多大，延迟就白白多留多大）。
+        if (shrinking) trimToDelay()
         return true
     }
 
-    fun offer(pcm: ByteArray) {
-        q.addLast(Chunk(pcm, nowMs()))
+    /** 丢弃已等待超过 delayMs（+一点点余量）的队首块，让队首年龄回到目标延迟附近。 */
+    private fun trimToDelay() {
+        val now = nowMs()
+        while (true) {
+            val head = q.peekFirst() ?: return
+            if (now - head.atMs < delayMs + SHRINK_SLACK_MS) return
+            q.pollFirst()
+            droppedChunks++
+        }
+    }
+
+    /** [tag] 随块带着走（这里放该块的 RTP 时间戳，写出时据此算媒体时间）。 */
+    fun offer(pcm: ByteArray, tag: Long = 0L) {
+        q.addLast(Chunk(pcm, nowMs(), tag))
     }
 
     /** 依次把已到点的块交给 [sink]（超期太久的直接丢弃）。 */
-    fun drainDue(sink: (ByteArray) -> Unit) {
+    fun drainDue(sink: (ByteArray, Long) -> Unit) {
         while (true) {
             val head = q.peekFirst() ?: return
             val age = nowMs() - head.atMs
@@ -56,7 +72,7 @@ internal class AudioDelayLine(private val nowMs: () -> Long = { System.currentTi
                 droppedChunks++
             } else if (age >= delayMs) {
                 q.pollFirst()
-                sink(head.pcm)
+                sink(head.pcm, head.tag)
             } else return
         }
     }
@@ -65,7 +81,8 @@ internal class AudioDelayLine(private val nowMs: () -> Long = { System.currentTi
 
     companion object {
         const val MAX_DELAY_MS = 1500L
-        const val RETARGET_MIN_MS = 60L
+        const val RETARGET_MIN_MS = 30L
         const val DROP_SLACK_MS = 150L
+        const val SHRINK_SLACK_MS = 25L
     }
 }
