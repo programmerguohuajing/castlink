@@ -35,11 +35,17 @@ object StreamStats {
     @Volatile var audioQueue = 0       // current playback-queue depth
     @Volatile var audioDupPct = 0      // % of RTP packets that were redundant duplicates
 
+    // 画面管线实测延迟（队列等待 + 解码器内部缓冲，毫秒；0 = 无画面/未测出）。音频据此延后同样的量，
+    // 让声音和落后的画面对齐（见 AudioDelayLine）。MirrorStreamServer 写，AudioStreamServer 读。
+    @Volatile var videoLatencyMs = 0
+    @Volatile var audioDelayMs = 0L    // 音频当前实际延后量（日志/HUD 用）
+
     /** Clears per-stream counters (call when a mirror session ends). Keeps [overlayEnabled]. */
     fun resetStreams() {
         videoRes = ""; videoFps = 0; videoQueue = 0; videoDropPct = 0
         videoWidth = 0; videoHeight = 0
         audioActive = false; audioQueue = 0; audioDupPct = 0
+        videoLatencyMs = 0; audioDelayMs = 0L
     }
 
     /** Human-readable multi-line HUD text. */

@@ -282,7 +282,8 @@ class AudioStreamServer(
             initDecoder()
             initAudioTrack()
             while (running) {
-                val payload = frameQueue.poll(200, TimeUnit.MILLISECONDS) ?: continue
+                val payload = frameQueue.poll(200, TimeUnit.MILLISECONDS)
+                if (payload == null) { flushDelayed(); continue }   // 没新帧时也要放出延后队列里到点的音频
                 try {
                     val decrypted = decryptPacket(payload)
                     if (alac != null) playAlacFrame(decrypted) else decodeFrame(decrypted)
@@ -310,7 +311,32 @@ class AudioStreamServer(
     private fun playAlacFrame(frame: ByteArray) {
         val pcm = alac?.decode(frame) ?: return
         if (firstPcm) { Logger.i("Audio: first decoded ALAC PCM (${pcm.size}B) → AudioTrack"); firstPcm = false }
-        audioTrack?.write(pcm, 0, pcm.size, AudioTrack.WRITE_BLOCKING)
+        writePcm(pcm)
+    }
+
+    // 音画同步：画面管线有几百毫秒延迟时，音频延后同样的量（见 AudioDelayLine）。仅播放线程使用。
+    private val delayLine = AudioDelayLine()
+
+    private fun writePcm(pcm: ByteArray) {
+        val track = audioTrack ?: return
+        // 目标延迟 = 视频侧实测的画面管线延迟；无画面（纯音频）时为 0，行为与以前完全一致。
+        if (delayLine.retarget(StreamStats.videoLatencyMs.toLong())) {
+            StreamStats.audioDelayMs = delayLine.delayMs
+            Logger.i("Audio: A/V sync — audio delayed ${delayLine.delayMs}ms to match video latency " +
+                "${StreamStats.videoLatencyMs}ms (dropped=${delayLine.droppedChunks})")
+        }
+        if (delayLine.delayMs == 0L && delayLine.isEmpty) {
+            track.write(pcm, 0, pcm.size, AudioTrack.WRITE_BLOCKING)
+            return
+        }
+        delayLine.offer(pcm)
+        delayLine.drainDue { track.write(it, 0, it.size, AudioTrack.WRITE_BLOCKING) }
+    }
+
+    private fun flushDelayed() {
+        val track = audioTrack ?: return
+        if (delayLine.isEmpty) return
+        delayLine.drainDue { track.write(it, 0, it.size, AudioTrack.WRITE_BLOCKING) }
     }
 
     /** True if this RTP sequence was already processed (a redundant retransmission). */
@@ -347,7 +373,7 @@ class AudioStreamServer(
             if (firstPcm) { Logger.i("Audio: first decoded PCM (${pcm.size}B) → AudioTrack"); firstPcm = false }
             // Blocking write paces playback to the audio clock and drops no PCM. Safe here because
             // this runs on the dedicated playback thread, not the socket-receive thread.
-            audioTrack?.write(pcm, 0, pcm.size, AudioTrack.WRITE_BLOCKING)
+            writePcm(pcm)
             mc.releaseOutputBuffer(outIdx, false)
             outIdx = mc.dequeueOutputBuffer(info, 0)
         }

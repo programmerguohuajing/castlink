@@ -698,7 +698,7 @@ class AirPlayReceiver(
 
         // “本机硬解不行 → 用软解 + 广播 720p”的持久化（与 App 其他设置同文件）。
         private const val PREFS_FILE = "castlink_prefs"
-        private const val PREF_SOFTWARE_DECODE = "airplay_software_decode"
+        private const val PREF_SOFTWARE_DECODE = "airplay_software_decode_v2"  // v2: 0.1.63 起 SPS 已补低延迟声明，重新探测一次硬解
 
         /**
          * UDP port for receiving audio RTP packets.

@@ -70,6 +70,15 @@ class MirrorStreamServer(
     @Volatile private var client: Socket? = null
     @Volatile private var decoder: VideoDecoder? = null   // owned by the decoder thread
     private var lastSps: ByteArray? = null
+    // 喂给解码器的 SPS = 原 SPS + VUI 低延迟声明（见 SpsLowLatency）；原 SPS 仍用于“带内 SPS 是否
+    // 变化”的比较，所以单独缓存。decoder 线程专用。
+    private var spsPatchSrc: ByteArray? = null
+    private var spsPatched: ByteArray? = null
+    // 画面管线延迟估计（decoder 线程）：out 吞吐 + 队列/解码器内帧数 → 毫秒，给音频延后用。
+    private var latLastMs = 0L
+    private var latLastOut = 0L
+    private var outRateFps = 0f
+    private var latencyEmaMs = 0f
     private var lastPps: ByteArray? = null
     // The Surface the current decoder was built against. The SurfaceView destroys its Surface when
     // the app backgrounds and creates a NEW one on return, so we watch for the identity changing
@@ -156,6 +165,7 @@ class MirrorStreamServer(
         runCatching { client?.close() }
         runCatching { serverSocket.close() }
         queue.clear()
+        StreamStats.videoLatencyMs = 0          // 画面没了：音频不再延后
         Logger.i("MirrorStreamServer stopped")
     }
 
@@ -257,6 +267,7 @@ class MirrorStreamServer(
             return
         }
         val out = d.framesOut
+        updatePipelineLatency(now, out)
         if (out != lastWatchdogOut) {
             lastWatchdogOut = out
             lastOutAdvanceMs = now
@@ -325,7 +336,7 @@ class MirrorStreamServer(
         Logger.i("Video stats: in=$framesIn fed=$decoderFed out=$out gated=$gatedFrames dropped=$framesDropped " +
             "decDrop=$decoderDropped (${StreamStats.videoDropPct}%) queue=${queue.size}/$QUEUE_CAPACITY " +
             "${StreamStats.videoFps}fps nal=$reassembledNals pend=${pendingAvcc.size()}B surf=$surf " +
-            "idr=$idrFed sps=$spsFed gop=${gop.size}f codec=${decoder?.codecName ?: "-"}$stall")
+            "lat=${StreamStats.videoLatencyMs}ms adelay=${StreamStats.audioDelayMs}ms idr=$idrFed sps=$spsFed gop=${gop.size}f codec=${decoder?.codecName ?: "-"}$stall")
         idrFed = 0
         spsFed = 0
     }
@@ -447,7 +458,7 @@ class MirrorStreamServer(
         val nd = VideoDecoder(surface, preferSoftware = useSoftwareDecoder)
         try {
             // csd 必须是裸 NAL（RAOP 路径就是这么传的）。
-            nd.initialize(sps, pps, width, height)
+            nd.initialize(decoderSps(sps), pps, width, height)
         } catch (e: Exception) {
             // 初始化失败（例如软解不支持该格式）绝不能杀死解码线程：保持 decoder=null，
             // 看门狗的空闲重建会定期重试；软解失败时下次重试回落硬解。
@@ -511,6 +522,40 @@ class MirrorStreamServer(
     }
 
     /** 下一帧的 PTS：自首次调用起的真实微秒数，严格递增（见字段注释）。 */
+    private fun decoderSps(sps: ByteArray): ByteArray {
+        if (!LOW_LATENCY_SPS) return sps
+        if (spsPatchSrc !== sps) {
+            spsPatchSrc = sps
+            spsPatched = SpsLowLatency.patch(sps)
+            Logger.i(if (spsPatched != null) "Mirror: SPS patched for low latency (reorder=0, ${sps.size}B -> ${spsPatched!!.size}B)"
+                     else "Mirror: SPS left as-is (already low-latency or unparsable)")
+        }
+        return spsPatched ?: sps
+    }
+
+    /**
+     * 估计画面管线延迟并发布给音频侧：Little 定律，延迟 = 在途帧数 / 吞吐。在途帧 = 队列里等待的
+     * + 解码器里的（decoderFed − out）；吞吐 = 每秒实际渲染帧数（EMA）。每秒更新一次；
+     * 画面静止（吞吐 < 5fps）时没有可靠吞吐，保持上一次的值；> 1s 的重放/积压瞬态不跟随。
+     */
+    private fun updatePipelineLatency(now: Long, out: Long) {
+        if (latLastMs == 0L || out < latLastOut) { latLastMs = now; latLastOut = out; return }
+        val dt = now - latLastMs
+        if (dt < LATENCY_SAMPLE_MS) return
+        val dOut = out - latLastOut
+        latLastMs = now; latLastOut = out
+        if (dOut >= 8) {
+            val rate = dOut * 1000f / dt
+            outRateFps = if (outRateFps == 0f) rate else outRateFps * 0.6f + rate * 0.4f
+        }
+        if (outRateFps < 5f) return
+        val frames = queue.size + (decoderFed - out).coerceAtLeast(0)
+        val ms = frames * 1000f / outRateFps
+        if (ms > LATENCY_MAX_FOLLOW_MS) return
+        latencyEmaMs = if (latencyEmaMs == 0f) ms else latencyEmaMs * 0.7f + ms * 0.3f
+        StreamStats.videoLatencyMs = latencyEmaMs.toInt()
+    }
+
     private fun nextPtsUs(): Long {
         val nowNs = System.nanoTime()
         if (ptsBaseNs == 0L) ptsBaseNs = nowNs
@@ -578,7 +623,7 @@ class MirrorStreamServer(
             val pps = lastPps
             if (sps != null && pps != null) {
                 val sc = MirrorCrypto.START_CODE
-                sc + sps + sc + pps + annexB
+                sc + decoderSps(sps) + sc + pps + annexB
             } else annexB
         } else annexB
         // GOP 缓存：与解码器状态无关，只跟码流走——IDR 起新 GOP，其余块按序追加。
@@ -767,6 +812,10 @@ class MirrorStreamServer(
         // 看门狗：已喂入却未输出的帧数阈值。30 时若输入是涓流（静态画面/手机缓冲），
         // 攒满 30 帧要半分钟，卡死恢复被拖到 40 秒（v0.1.60 实测 out=54 后 31 秒才
         // 切换）；健康播放时 out 持续前进不会误触发（还要叠加 1.5 秒静默条件），故降到 10。
+        // 给 SPS 补 VUI 低延迟声明（解码器不再压 ~13 帧等重排序）；万一某设备因此异常，改 false 即可关闭。
+        private const val LOW_LATENCY_SPS = true
+        private const val LATENCY_SAMPLE_MS = 1000L
+        private const val LATENCY_MAX_FOLLOW_MS = 1200f
         private const val STALL_GAP_FED = 10
         private const val STALL_QUIET_MS = 1500L               // 看门狗：out 纹丝不动的时长阈值
         private const val STALL_RECREATE_COOLDOWN_MS = 5000L   // 看门狗/丢帧重建冷却（见 checkStallWatchdog）
