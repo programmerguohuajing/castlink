@@ -125,6 +125,7 @@
                             android:textSize="13sp" />
 
                         <ListView
+                            android:listSelector="@android:color/transparent"
                             android:id="@+id/lv_devices"
                             android:layout_width="match_parent"
                             android:layout_height="match_parent"
@@ -163,6 +164,7 @@
 
             <!-- 第 1 页：媒体 -->
             <ListView
+                android:listSelector="@android:color/transparent"
                 android:id="@+id/lv_media_files"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"

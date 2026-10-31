@@ -4,14 +4,12 @@ import android.app.AlertDialog
 import android.content.SharedPreferences
 import android.os.Build
 import android.os.Bundle
-import android.view.KeyEvent
 import android.view.View
 import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.EditText
 import android.widget.ImageButton
 import android.widget.LinearLayout
-import android.widget.RadioButton
 import android.widget.RadioGroup
 import android.widget.Spinner
 import android.widget.TextView
@@ -75,6 +73,7 @@ class SettingsActivity : BaseActivity() {
                 else -> QUALITY_AUTO
             }
             prefs.edit().putString(KEY_QUALITY, value).apply()
+            relinkFocus?.invoke()      // 上下邻居要指向新的选中项
         }
 
         // 优先 5GHz（持久化）——支持整行点击与胶囊按钮点击
@@ -153,23 +152,25 @@ class SettingsActivity : BaseActivity() {
     }
 
     /**
-     * 手动 D-pad 焦点链。按布局从上到下顺序，UP/DOWN 移动焦点，
-     * CENTER/ENTER 触发点击。
+     * 遥控器 D-pad 焦点链（v0.1.67 重写）。
+     *
+     * 旧实现自己存一个“当前第几项”并在 onKeyDown 里手动 requestFocus，与系统真实焦点是两套状态：
+     * 左右键/触摸/空鼠一动就对不上（高亮与被点的不是同一项、上下乱跳），而且触摸模式下
+     * requestFocus() 对多数控件直接失败（高亮不动、选不中）。
+     * 现在不再拦截按键：给每个停靠点显式设置上/下邻居，其余交给系统——系统会自己退出触摸模式、
+     * 把焦点项滚进可视区，Enter/OK 由获得焦点的控件自己响应点击。
      */
-    private var dpadFocusIndex = 0
-    private lateinit var dpadFocusList: List<View>
+    private var relinkFocus: (() -> Unit)? = null
 
     private fun setupManualDpad() {
-        // 显式 <View>：否则元素类型会被下面的 RadioButton 元素带偏推断成 RadioButton，
-        // 无类型的 findViewById（如 ImageButton 的返回键）存入数组时抛 ArrayStoreException
-        dpadFocusList = listOfNotNull<View>(
+        val rg = findViewById<RadioGroup>(R.id.rg_quality)
+        // 按布局从上到下的停靠点；画质分段单选组作为一个停靠点（组内左右键切换）
+        val stops: List<View> = listOfNotNull<View>(
             findViewById(R.id.btn_settings_back),
             findViewById(R.id.et_device_name),
             findViewById(R.id.btn_save_device_name),
             findViewById(R.id.row_prefer_5g),
-            findViewById<RadioGroup>(R.id.rg_quality)?.let { rg ->
-                rg.findViewById<RadioButton>(rg.checkedRadioButtonId) ?: findViewById(R.id.rb_quality_auto)
-            },
+            rg,
             findViewById(R.id.row_legacy_mode),
             findViewById(R.id.row_skip_pair_verify),
             findViewById(R.id.row_av_trim),
@@ -183,39 +184,38 @@ class SettingsActivity : BaseActivity() {
             findViewById(R.id.btn_check_update)
         ).filter { it.visibility == View.VISIBLE }
 
-        dpadFocusList.firstOrNull()?.let {
-            it.requestFocus()
-            dpadFocusIndex = 0
-        }
-    }
+        // 开关行右侧的胶囊只是状态指示，整行本身可点：不让它们抢焦点，否则左右键会漂到不在链上的控件
+        listOf(
+            R.id.btn_prefer_5g, R.id.btn_legacy_mode, R.id.btn_skip_pair_verify,
+            R.id.btn_av_trim, R.id.btn_auto_update
+        ).forEach { findViewById<View>(it)?.isFocusable = false }
 
-    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        if (!::dpadFocusList.isInitialized || dpadFocusList.isEmpty()) {
-            return super.onKeyDown(keyCode, event)
-        }
-        when (keyCode) {
-            KeyEvent.KEYCODE_DPAD_DOWN -> {
-                dpadFocusIndex = (dpadFocusIndex + 1) % dpadFocusList.size
-                dpadFocusList[dpadFocusIndex].requestFocus()
-                return true
+        // 进入分段单选组时落在“当前选中项”上
+        fun entry(v: View): View =
+            if (v === rg) (rg.findViewById<View>(rg.checkedRadioButtonId) ?: rg.getChildAt(0)) else v
+
+        relinkFocus = {
+            for (i in stops.indices) {
+                val prev = stops.getOrNull(i - 1)?.let { entry(it) }
+                val next = stops.getOrNull(i + 1)?.let { entry(it) }
+                val members: List<View> =
+                    if (stops[i] === rg) (0 until rg.childCount).map { rg.getChildAt(it) } else listOf(stops[i])
+                for (v in members) {
+                    if (prev != null) v.nextFocusUpId = prev.id
+                    if (next != null) v.nextFocusDownId = next.id
+                }
             }
-            KeyEvent.KEYCODE_DPAD_UP -> {
-                dpadFocusIndex = (dpadFocusIndex - 1 + dpadFocusList.size) % dpadFocusList.size
-                dpadFocusList[dpadFocusIndex].requestFocus()
-                return true
-            }
-            KeyEvent.KEYCODE_DPAD_CENTER,
-            KeyEvent.KEYCODE_ENTER -> {
-                dpadFocusList.getOrNull(dpadFocusIndex)?.performClick()
-                return true
-            }
-            KeyEvent.KEYCODE_DPAD_LEFT,
-            KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                // 水平按键让系统焦点（如 RadioGroup 内部切换）自行处理
-                return super.onKeyDown(keyCode, event)
+            // 分段单选组：左右键只在组内移动，到头不外溢
+            val n = rg.childCount
+            for (i in 0 until n) {
+                val c = rg.getChildAt(i)
+                if (i == 0) c.nextFocusLeftId = c.id
+                if (i == n - 1) c.nextFocusRightId = c.id
             }
         }
-        return super.onKeyDown(keyCode, event)
+        relinkFocus?.invoke()
+
+        stops.firstOrNull()?.requestFocus()
     }
 
     /** 可信局域网跳过配对校验 + 清除已配对设备 */

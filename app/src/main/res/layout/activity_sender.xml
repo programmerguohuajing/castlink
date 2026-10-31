@@ -48,6 +48,7 @@
         android:textSize="13sp" />
 
     <ListView
+        android:listSelector="@android:color/transparent"
         android:id="@+id/lv_sender_devices"
         android:layout_width="match_parent"
         android:layout_height="0dp"
