@@ -10,7 +10,7 @@
     <LinearLayout
         android:layout_width="120dp"
         android:layout_height="match_parent"
-        android:background="#CC0A1128"
+        android:background="@color/nebula_nav"
         android:gravity="center_horizontal"
         android:orientation="vertical"
         android:padding="8dp">
@@ -19,10 +19,9 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            android:letterSpacing="0.2"
-            android:text="CASTLINK"
-            android:textColor="@color/nebula_cyan"
-            android:textSize="13sp"
+            android:text="CastLink"
+            android:textColor="@color/nebula_text"
+            android:textSize="18sp"
             android:textStyle="bold" />
 
         <Button
@@ -30,7 +29,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:background="@drawable/bg_glass_btn"
+            android:background="@drawable/bg_tab"
             android:text="@string/tab_cast"
             android:textColor="@color/nebula_cyan" />
 
@@ -39,7 +38,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:background="@drawable/bg_glass_btn"
+            android:background="@drawable/bg_tab"
             android:text="@string/tab_media"
             android:textColor="@color/nebula_text_2ry" />
 
@@ -48,7 +47,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:background="@drawable/bg_glass_btn"
+            android:background="@drawable/bg_tab"
             android:text="@string/tab_mine"
             android:textColor="@color/nebula_text_2ry" />
     </LinearLayout>
@@ -96,7 +95,7 @@
                             android:layout_height="56dp"
                             android:background="@drawable/bg_neon_btn"
                             android:text="@string/btn_start_cast"
-                            android:textColor="#050810"
+                            android:textColor="@color/nebula_on_accent"
                             android:textSize="16sp"
                             android:textStyle="bold" />
 
@@ -121,7 +120,6 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:letterSpacing="0.2"
                             android:text="@string/devices_title"
                             android:textColor="@color/nebula_text_3ry"
                             android:textSize="13sp" />

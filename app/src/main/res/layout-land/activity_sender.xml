@@ -17,9 +17,8 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:letterSpacing="0.25"
-            android:text="CASTLINK"
-            android:textColor="@color/nebula_cyan"
+            android:text="CastLink"
+            android:textColor="@color/nebula_text"
             android:textSize="16sp"
             android:textStyle="bold" />
 
@@ -72,7 +71,6 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:letterSpacing="0.2"
             android:text="@string/devices_title"
             android:textColor="@color/nebula_text_3ry"
             android:textSize="13sp" />
