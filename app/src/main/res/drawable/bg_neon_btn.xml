@@ -1,34 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- NEBULA 主按钮：电光青渐变 -->
+<!-- 主按钮：实色强调色，TV 焦点加粗描边 -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:state_pressed="true">
-        <shape android:shape="rectangle">
-            <gradient
-                android:angle="0"
-                android:startColor="#0097B9"
-                android:endColor="#007A94" />
+        <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+            <solid android:color="@color/nebula_cyan_dark" />
             <corners android:radius="16dp" />
         </shape>
     </item>
-    <!-- TV 遥控器 D-pad 焦点：高亮描边 -->
     <item android:state_focused="true">
-        <shape android:shape="rectangle">
-            <gradient
-                android:angle="0"
-                android:startColor="#00E5FF"
-                android:endColor="#0097B9" />
-            <stroke
-                android:width="3dp"
-                android:color="#FFFFFF" />
+        <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+            <solid android:color="@color/nebula_cyan" />
+            <stroke android:width="3dp" android:color="@color/nebula_text" />
             <corners android:radius="16dp" />
         </shape>
     </item>
     <item>
-        <shape android:shape="rectangle">
-            <gradient
-                android:angle="0"
-                android:startColor="#00E5FF"
-                android:endColor="#0097B9" />
+        <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+            <solid android:color="@color/nebula_cyan" />
             <corners android:radius="16dp" />
         </shape>
     </item>

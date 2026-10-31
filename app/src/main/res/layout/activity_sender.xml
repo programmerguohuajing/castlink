@@ -1,19 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- NEBULA 发送端 -->
+<!-- 发送端 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/bg_nebula"
     android:orientation="vertical"
-    android:padding="20dp">
+    android:padding="24dp">
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:letterSpacing="0.25"
-        android:text="CASTLINK"
-        android:textColor="@color/nebula_cyan"
-        android:textSize="16sp"
+        android:text="CastLink"
+        android:textColor="@color/nebula_text"
+        android:textSize="24sp"
         android:textStyle="bold" />
 
     <!-- 状态胶囊 -->
@@ -44,7 +43,6 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="20dp"
-        android:letterSpacing="0.2"
         android:text="@string/devices_title"
         android:textColor="@color/nebula_text_3ry"
         android:textSize="13sp" />
@@ -63,7 +61,7 @@
         android:layout_width="match_parent"
         android:layout_height="56dp"
         android:layout_marginTop="12dp"
-        android:background="@drawable/bg_glass_btn"
+        android:background="@drawable/bg_danger_btn"
         android:text="@string/sender_stop"
         android:textColor="@color/nebula_red"
         android:textSize="16sp" />

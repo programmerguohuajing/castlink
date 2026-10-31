@@ -2,7 +2,7 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/deep_blue"
+    android:background="@drawable/bg_nebula"
     android:orientation="vertical"
     android:padding="16dp">
 
@@ -11,7 +11,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="@string/player_title"
-        android:textColor="@color/white"
+        android:textColor="@color/nebula_text"
         android:textSize="24sp"
         android:textStyle="bold" />
 
@@ -53,7 +53,7 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="4dp"
         android:text="@string/player_formats"
-        android:textColor="@color/text_secondary"
+        android:textColor="@color/nebula_text_2ry"
         android:textSize="13sp" />
 
     <LinearLayout

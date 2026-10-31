@@ -1,12 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- NEBULA 深色主题 -->
-    <style name="Theme.CastLink" parent="android:Theme.Material.NoActionBar">
+    <style name="Theme.CastLink" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:colorPrimary">@color/nebula_cyan</item>
         <item name="android:colorPrimaryDark">@color/nebula_bg</item>
         <item name="android:colorAccent">@color/nebula_cyan</item>
-        <item name="android:windowBackground">@drawable/bg_nebula</item>
+        <item name="android:windowBackground">@color/nebula_bg</item>
+        <item name="android:statusBarColor">@color/nebula_bg</item>
+        <item name="android:navigationBarColor">@color/nebula_bg</item>
         <item name="android:textColorPrimary">@color/nebula_text</item>
         <item name="android:textColorSecondary">@color/nebula_text_2ry</item>
+        <item name="android:textColorHint">@color/nebula_text_3ry</item>
+        <item name="android:windowLightStatusBar">true</item>
     </style>
 </resources>

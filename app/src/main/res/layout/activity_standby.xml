@@ -47,10 +47,9 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="20dp"
-        android:letterSpacing="0.35"
-        android:text="CASTLINK"
+        android:text="CastLink"
         android:textColor="@color/nebula_cyan"
-        android:textSize="14sp"
+        android:textSize="15sp"
         android:textStyle="bold" />
 
     <TextView
@@ -140,10 +139,10 @@
                 android:textSize="12sp" />
 
             <LinearLayout
-                    android:layout_width="420dp"
-                    android:layout_height="110dp"
+                    android:layout_width="match_parent"
+                    android:layout_height="96dp"
                     android:layout_marginTop="8dp"
-                    android:background="#0A1226"
+                    android:background="@drawable/bg_pin_box"
                     android:gravity="center"
                     android:orientation="horizontal">
 
@@ -152,7 +151,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:gravity="center"
-                        android:textColor="#00E5FF"
+                        android:textColor="@color/nebula_cyan"
                         android:textSize="52sp"
                         android:textStyle="bold"
                         android:letterSpacing="0.1" />
@@ -202,7 +201,7 @@
             android:paddingTop="5dp"
             android:paddingEnd="10dp"
             android:paddingBottom="5dp"
-            android:textColor="@color/white"
+            android:textColor="@color/nebula_on_accent"
             android:textSize="12sp" />
 
         <TextView

@@ -1,10 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- 开关关闭状态胶囊 -->
-<shape xmlns:android="http://schemas.android.com/apk/res/android"
-    android:shape="rectangle">
-    <solid android:color="#1A284A" />
-    <stroke
-        android:width="1dp"
-        android:color="#2A3D63" />
-    <corners android:radius="14dp" />
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="@color/nebula_fill" />
+    <stroke android:width="1dp" android:color="@color/nebula_glass_border" />
+    <corners android:radius="16dp" />
 </shape>

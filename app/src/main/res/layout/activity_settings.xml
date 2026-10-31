@@ -127,7 +127,7 @@
                         android:paddingStart="20dp"
                         android:paddingEnd="20dp"
                         android:text="@string/btn_save"
-                        android:textColor="@color/white"
+                        android:textColor="@color/nebula_on_accent"
                         android:textSize="14sp" />
                 </LinearLayout>
 
@@ -136,13 +136,13 @@
                     android:layout_height="1dp"
                     android:layout_marginTop="16dp"
                     android:layout_marginBottom="16dp"
-                    android:background="#1F2F4D" />
+                    android:background="@color/nebula_divider" />
 
                 <!-- 本机能力指示卡片 -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:background="#141E38"
+                    android:background="@color/nebula_fill"
                     android:orientation="vertical"
                     android:padding="14dp">
 
@@ -168,7 +168,7 @@
                     android:layout_height="1dp"
                     android:layout_marginTop="16dp"
                     android:layout_marginBottom="8dp"
-                    android:background="#1F2F4D" />
+                    android:background="@color/nebula_divider" />
 
                 <!-- 优先 5GHz Wi-Fi -->
                 <LinearLayout
@@ -318,7 +318,7 @@
                     android:layout_height="1dp"
                     android:layout_marginTop="16dp"
                     android:layout_marginBottom="8dp"
-                    android:background="#1F2F4D" />
+                    android:background="@color/nebula_divider" />
 
                 <!-- 兼容模式开关 -->
                 <LinearLayout
@@ -439,7 +439,7 @@
                     android:layout_height="1dp"
                     android:layout_marginTop="8dp"
                     android:layout_marginBottom="12dp"
-                    android:background="#1F2F4D" />
+                    android:background="@color/nebula_divider" />
 
                 <!-- 声画微调：点击在档位间循环 -->
                 <LinearLayout
@@ -493,7 +493,7 @@
                     android:layout_height="1dp"
                     android:layout_marginTop="8dp"
                     android:layout_marginBottom="12dp"
-                    android:background="#1F2F4D" />
+                    android:background="@color/nebula_divider" />
 
                 <!-- 清除配对凭证 -->
                 <LinearLayout
@@ -598,9 +598,52 @@
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
+                    android:layout_marginTop="4dp"
+                    android:layout_marginBottom="4dp"
+                    android:background="@color/nebula_divider" />
+
+                <!-- 外观（浅色/深色/跟随系统） -->
+                <LinearLayout
+                    android:id="@+id/row_theme"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/bg_settings_row"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:padding="12dp">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/setting_theme_title"
+                        android:textColor="@color/nebula_text"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tv_theme_summary"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="@color/nebula_cyan"
+                        android:textSize="14sp" />
+
+                    <ImageView
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:layout_marginStart="8dp"
+                        android:contentDescription="Next"
+                        android:src="@drawable/ic_chevron_right" />
+                </LinearLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
                     android:layout_marginTop="8dp"
                     android:layout_marginBottom="16dp"
-                    android:background="#1F2F4D" />
+                    android:background="@color/nebula_divider" />
 
                 <!-- 镜像源选择 -->
                 <TextView
@@ -636,7 +679,7 @@
                         android:paddingStart="16dp"
                         android:paddingEnd="16dp"
                         android:text="@string/setting_apply_mirror"
-                        android:textColor="@color/white"
+                        android:textColor="@color/nebula_on_accent"
                         android:textSize="14sp" />
                 </LinearLayout>
 
@@ -645,7 +688,7 @@
                     android:layout_height="1dp"
                     android:layout_marginTop="16dp"
                     android:layout_marginBottom="8dp"
-                    android:background="#1F2F4D" />
+                    android:background="@color/nebula_divider" />
 
                 <!-- 自动检查更新开关 -->
                 <LinearLayout
@@ -699,7 +742,7 @@
                     android:layout_height="1dp"
                     android:layout_marginTop="8dp"
                     android:layout_marginBottom="16dp"
-                    android:background="#1F2F4D" />
+                    android:background="@color/nebula_divider" />
 
                 <!-- 版本信息与操作按钮 -->
                 <LinearLayout
@@ -752,7 +795,7 @@
                         android:paddingStart="14dp"
                         android:paddingEnd="14dp"
                         android:text="@string/btn_check_update"
-                        android:textColor="@color/white"
+                        android:textColor="@color/nebula_on_accent"
                         android:textSize="13sp" />
                 </LinearLayout>
 

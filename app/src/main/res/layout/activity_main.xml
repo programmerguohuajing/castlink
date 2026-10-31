@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- NEBULA 手机主页 -->
+<!-- 手机主页：简洁现代，浅/深双主题 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -12,24 +12,31 @@
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:padding="20dp">
+        android:paddingStart="24dp"
+        android:paddingTop="20dp"
+        android:paddingEnd="24dp"
+        android:paddingBottom="12dp">
 
         <TextView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:letterSpacing="0.25"
-            android:text="CASTLINK"
-            android:textColor="@color/nebula_cyan"
-            android:textSize="20sp"
+            android:text="CastLink"
+            android:textColor="@color/nebula_text"
+            android:textSize="26sp"
             android:textStyle="bold" />
 
         <TextView
             android:id="@+id/tv_wifi_status"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:background="@drawable/bg_chip"
+            android:paddingStart="12dp"
+            android:paddingTop="6dp"
+            android:paddingEnd="12dp"
+            android:paddingBottom="6dp"
             android:textColor="@color/nebula_text_2ry"
-            android:textSize="13sp" />
+            android:textSize="12sp" />
     </LinearLayout>
 
     <ViewFlipper
@@ -47,7 +54,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:orientation="vertical"
-                android:padding="20dp">
+                android:padding="24dp">
 
                 <Button
                     android:id="@+id/btn_start_cast"
@@ -55,7 +62,7 @@
                     android:layout_height="60dp"
                     android:background="@drawable/bg_neon_btn"
                     android:text="@string/btn_start_cast"
-                    android:textColor="#050810"
+                    android:textColor="@color/nebula_on_accent"
                     android:textSize="17sp"
                     android:textStyle="bold" />
 
@@ -73,7 +80,6 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="20dp"
-                    android:letterSpacing="0.2"
                     android:text="@string/devices_title"
                     android:textColor="@color/nebula_text_3ry"
                     android:textSize="13sp" />
@@ -146,12 +152,11 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:orientation="vertical"
-            android:padding="20dp">
+            android:padding="24dp">
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:letterSpacing="0.2"
                 android:text="@string/tab_media"
                 android:textColor="@color/nebula_text_3ry"
                 android:textSize="13sp" />
@@ -170,7 +175,7 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:orientation="vertical"
-            android:padding="20dp">
+            android:padding="24dp">
 
             <TextView
                 android:layout_width="wrap_content"
@@ -210,20 +215,28 @@
         </LinearLayout>
     </ViewFlipper>
 
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/nebula_divider" />
+
     <!-- 底部 Tab -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="#CC0A1128"
+        android:background="@color/nebula_nav"
         android:orientation="horizontal"
-        android:padding="8dp">
+        android:paddingStart="12dp"
+        android:paddingTop="8dp"
+        android:paddingEnd="12dp"
+        android:paddingBottom="8dp">
 
         <Button
             android:id="@+id/tab_btn_cast"
             android:layout_width="0dp"
             android:layout_height="52dp"
             android:layout_weight="1"
-            android:background="@drawable/bg_glass_btn"
+            android:background="@drawable/bg_tab"
             android:text="@string/tab_cast"
             android:textColor="@color/nebula_cyan" />
 
@@ -233,7 +246,7 @@
             android:layout_height="52dp"
             android:layout_marginStart="8dp"
             android:layout_weight="1"
-            android:background="@drawable/bg_glass_btn"
+            android:background="@drawable/bg_tab"
             android:text="@string/tab_media"
             android:textColor="@color/nebula_text_2ry" />
 
@@ -243,7 +256,7 @@
             android:layout_height="52dp"
             android:layout_marginStart="8dp"
             android:layout_weight="1"
-            android:background="@drawable/bg_glass_btn"
+            android:background="@drawable/bg_tab"
             android:text="@string/tab_mine"
             android:textColor="@color/nebula_text_2ry" />
     </LinearLayout>

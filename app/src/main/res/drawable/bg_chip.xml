@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 信息胶囊（Wi-Fi 状态等） -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="@color/nebula_fill" />
+    <corners android:radius="999dp" />
+</shape>

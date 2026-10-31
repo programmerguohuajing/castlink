@@ -20,6 +20,7 @@ import com.castlink.receiver.R
 import com.castlink.receiver.update.UpdateManager
 import com.castlink.receiver.update.UpdatePrefs
 import com.castlink.receiver.util.LocaleHelper
+import com.castlink.receiver.util.ThemeHelper
 
 /**
  * 设置页（UI-04）：语言切换、本机能力卡、画质单选、开关项、设备名与系统维护。
@@ -31,6 +32,7 @@ class SettingsActivity : BaseActivity() {
 
     private lateinit var prefs: SharedPreferences
     private lateinit var tvLangSummary: TextView
+    private lateinit var tvThemeSummary: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -48,6 +50,11 @@ class SettingsActivity : BaseActivity() {
         findViewById<LinearLayout>(R.id.row_language).setOnClickListener {
             showLanguageDialog()
         }
+
+        // 外观：浅色 / 深色 / 跟随系统
+        tvThemeSummary = findViewById(R.id.tv_theme_summary)
+        tvThemeSummary.text = themeLabel(ThemeHelper.getTheme(this))
+        findViewById<LinearLayout>(R.id.row_theme).setOnClickListener { showThemeDialog() }
 
         // 画质分段胶囊单选（持久化）
         val rgQuality = findViewById<RadioGroup>(R.id.rg_quality)
@@ -168,6 +175,7 @@ class SettingsActivity : BaseActivity() {
             findViewById(R.id.row_av_trim),
             findViewById(R.id.btn_clear_pairings),
             findViewById(R.id.row_language),
+            findViewById(R.id.row_theme),
             findViewById(R.id.sp_update_mirror),
             findViewById(R.id.btn_save_update_cfg),
             findViewById(R.id.row_auto_update),
@@ -366,6 +374,29 @@ class SettingsActivity : BaseActivity() {
     override fun onResume() {
         super.onResume()
         tvLangSummary.text = LocaleHelper.getDisplayName(this)
+    }
+
+    private fun themeLabel(theme: String): String = getString(
+        when (theme) {
+            ThemeHelper.THEME_LIGHT -> R.string.theme_light
+            ThemeHelper.THEME_DARK -> R.string.theme_dark
+            else -> R.string.theme_system
+        }
+    )
+
+    private fun showThemeDialog() {
+        val values = arrayOf(ThemeHelper.THEME_SYSTEM, ThemeHelper.THEME_LIGHT, ThemeHelper.THEME_DARK)
+        val labels = Array(values.size) { themeLabel(values[it]) }
+        val checked = values.indexOf(ThemeHelper.getTheme(this)).coerceAtLeast(0)
+        AlertDialog.Builder(this)
+            .setTitle(R.string.dialog_theme_title)
+            .setSingleChoiceItems(labels, checked) { dialog, which ->
+                ThemeHelper.setTheme(this, values[which])
+                dialog.dismiss()
+                recreate()
+            }
+            .setNegativeButton(R.string.disconnect_cancel, null)
+            .show()
     }
 
     private fun showLanguageDialog() {

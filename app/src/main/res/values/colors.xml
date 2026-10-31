@@ -1,41 +1,42 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- NEBULA 设计系统：深空科技风 -->
-    <!-- 背景 -->
-    <color name="nebula_bg">#050810</color>
-    <color name="nebula_bg_end">#0D1730</color>
-    <color name="nebula_surface">#0F1830</color>
-    <color name="nebula_glass">#16213C</color>
-    <color name="nebula_glass_border">#2A3A5C</color>
+    <!-- CastLink 设计令牌 · 浅色（默认）。名称保持 nebula_* 以兼容既有引用，含义为语义色 -->
+    <color name="nebula_bg">#F5F7FB</color>
+    <color name="nebula_bg_end">#EAEFF8</color>
+    <color name="nebula_surface">#FFFFFF</color>
+    <color name="nebula_glass">#FFFFFF</color>
+    <color name="nebula_glass_border">#DCE3EF</color>
+    <color name="nebula_cyan">#2563EB</color>
+    <color name="nebula_cyan_dark">#1D4FBF</color>
+    <color name="nebula_cyan_glow">#1F2563EB</color>
+    <color name="nebula_blue">#4F46E5</color>
+    <color name="nebula_violet">#7C3AED</color>
+    <color name="nebula_text">#0F172A</color>
+    <color name="nebula_text_2ry">#475569</color>
+    <color name="nebula_text_3ry">#7A869A</color>
+    <color name="nebula_green">#16A34A</color>
+    <color name="nebula_red">#DC2626</color>
+    <color name="nebula_amber">#B45309</color>
+    <color name="nebula_on_accent">#FFFFFF</color>
+    <color name="nebula_fill">#EEF2F8</color>
+    <color name="nebula_fill_strong">#E1E8F3</color>
+    <color name="nebula_accent_soft">#1A2563EB</color>
+    <color name="nebula_divider">#E4E9F2</color>
+    <color name="nebula_scrim">#99FFFFFF</color>
+    <color name="nebula_nav">#F2FFFFFF</color>
+    <color name="nebula_danger_soft">#14DC2626</color>
+    <color name="nebula_danger_border">#4DDC2626</color>
 
-    <!-- 主色：电光青 -->
-    <color name="nebula_cyan">#00E5FF</color>
-    <color name="nebula_cyan_dark">#0097B9</color>
-    <color name="nebula_cyan_glow">#3300E5FF</color>
-    <!-- 辅助：霓虹蓝 / 紫罗兰 -->
-    <color name="nebula_blue">#3D5AFE</color>
-    <color name="nebula_violet">#7C4DFF</color>
-
-    <!-- 文字 -->
-    <color name="nebula_text">#FFFFFF</color>
-    <color name="nebula_text_2ry">#9AA5BC</color>
-    <color name="nebula_text_3ry">#5C6B87</color>
-
-    <!-- 状态 -->
-    <color name="nebula_green">#00E676</color>
-    <color name="nebula_red">#FF5252</color>
-    <color name="nebula_amber">#FFD740</color>
-
-    <!-- 兼容旧名 -->
-    <color name="primary_blue">#00E5FF</color>
-    <color name="deep_blue">#0D1730</color>
-    <color name="connect_cyan">#00E5FF</color>
-    <color name="flagship_cyan">#00E5FF</color>
-    <color name="mainstream_blue">#3D5AFE</color>
-    <color name="legacy_gray">#5C6B87</color>
-    <color name="error_red">#FF5252</color>
-    <color name="status_green">#00E676</color>
+    <!-- 兼容旧名（均指向语义色） -->
+    <color name="primary_blue">@color/nebula_cyan</color>
+    <color name="deep_blue">@color/nebula_bg_end</color>
+    <color name="connect_cyan">@color/nebula_cyan</color>
+    <color name="flagship_cyan">@color/nebula_cyan</color>
+    <color name="mainstream_blue">@color/nebula_blue</color>
+    <color name="legacy_gray">@color/nebula_text_3ry</color>
+    <color name="error_red">@color/nebula_red</color>
+    <color name="status_green">@color/nebula_green</color>
+    <color name="text_secondary">@color/nebula_text_2ry</color>
     <color name="white">#FFFFFF</color>
     <color name="black">#000000</color>
-    <color name="text_secondary">#9AA5BC</color>
 </resources>

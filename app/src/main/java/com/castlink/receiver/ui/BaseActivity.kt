@@ -3,6 +3,7 @@ package com.castlink.receiver.ui
 import android.app.Activity
 import android.content.Context
 import com.castlink.receiver.util.LocaleHelper
+import com.castlink.receiver.util.ThemeHelper
 
 /**
  * 所有 Activity 的基类：在 attachBaseContext 阶段按用户语言设置包装 Context，
@@ -11,6 +12,6 @@ import com.castlink.receiver.util.LocaleHelper
  */
 open class BaseActivity : Activity() {
     override fun attachBaseContext(newBase: Context) {
-        super.attachBaseContext(LocaleHelper.applyLocale(newBase))
+        super.attachBaseContext(ThemeHelper.applyTheme(LocaleHelper.applyLocale(newBase)))
     }
 }

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- CastLink 设计令牌 · 深色 -->
+    <color name="nebula_bg">#0B0F1A</color>
+    <color name="nebula_bg_end">#0B0F1A</color>
+    <color name="nebula_surface">#131929</color>
+    <color name="nebula_glass">#171E30</color>
+    <color name="nebula_glass_border">#2A3550</color>
+    <color name="nebula_cyan">#6BA6FF</color>
+    <color name="nebula_cyan_dark">#4B8BEF</color>
+    <color name="nebula_cyan_glow">#336BA6FF</color>
+    <color name="nebula_blue">#8B93FF</color>
+    <color name="nebula_violet">#A78BFA</color>
+    <color name="nebula_text">#F3F6FC</color>
+    <color name="nebula_text_2ry">#A6B1C7</color>
+    <color name="nebula_text_3ry">#6F7B94</color>
+    <color name="nebula_green">#3DDC84</color>
+    <color name="nebula_red">#FF6B6B</color>
+    <color name="nebula_amber">#FFC857</color>
+    <color name="nebula_on_accent">#0B1226</color>
+    <color name="nebula_fill">#1E2740</color>
+    <color name="nebula_fill_strong">#27324F</color>
+    <color name="nebula_accent_soft">#266BA6FF</color>
+    <color name="nebula_divider">#222B42</color>
+    <color name="nebula_scrim">#99000000</color>
+    <color name="nebula_nav">#F20F1424</color>
+    <color name="nebula_danger_soft">#26FF6B6B</color>
+    <color name="nebula_danger_border">#66FF6B6B</color>
+</resources>
