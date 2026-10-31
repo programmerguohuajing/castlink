@@ -125,8 +125,114 @@ class SettingsActivity : BaseActivity() {
         // AirPlay 配对
         setupAirPlaySection()
 
-        // 手动 D-pad 焦点控制（兼容 TV 遥控器）
+        // 电视/横屏版：左侧分组导航（竖屏版没有这些控件，自动跳过）
+        setupTvPanels()
+
+        // D-pad 焦点链（兼容 TV 遥控器）
         setupManualDpad()
+    }
+
+    // ---- 电视/横屏版：分组导航 -------------------------------------------------
+
+    private var navItems: List<View> = emptyList()
+
+    /**
+     * 横屏布局（layout-land）把设置拆成 4 个分组，左侧导航选分组、右侧只显示当前分组。
+     * 遥控器上“焦点移到哪个导航项就显示哪个分组”，不必再按确认；触摸则点击切换。
+     * 竖屏布局没有 nav_* / group_* 控件：直接返回，行为与之前完全一致。
+     */
+    private fun setupTvPanels() {
+        val navIds = listOf(R.id.nav_device, R.id.nav_quality, R.id.nav_protocol, R.id.nav_system)
+        val groupIds = listOf(R.id.group_device, R.id.group_quality, R.id.group_protocol, R.id.group_system)
+        val navs = navIds.mapNotNull { findViewById<View>(it) }
+        val groups = groupIds.mapNotNull { findViewById<View>(it) }
+        if (navs.size != navIds.size || groups.size != groupIds.size) return
+        navItems = navs
+        val scroll = findViewById<View>(R.id.settings_scroll)
+
+        fun show(index: Int) {
+            groups.forEachIndexed { j, g -> g.visibility = if (j == index) View.VISIBLE else View.GONE }
+            navs.forEachIndexed { j, n -> n.isSelected = (j == index) }
+            scroll?.scrollTo(0, 0)
+        }
+        navs.forEachIndexed { i, n ->
+            n.setOnClickListener { show(i) }
+            n.setOnFocusChangeListener { _, hasFocus -> if (hasFocus) show(i) }
+        }
+        show(0)
+    }
+
+    /**
+     * 电视版焦点链：返回键 → 4 个导航项（上下）；导航项按右键进入该分组第一项；
+     * 分组内逐行上下移动、同一行内左右移动；最左一项按左键回到导航，第一行按上键回到导航。
+     * 全部用显式 nextFocus*，交给系统导航（会自动退出触摸模式、滚动到可视区）。
+     */
+    private fun setupTvFocus() {
+        val rg = findViewById<RadioGroup>(R.id.rg_quality)
+        val back = findViewById<View>(R.id.btn_settings_back)
+        fun byId(id: Int): View? = findViewById<View>(id)
+        val radioRow: List<View> = (0 until rg.childCount).map { rg.getChildAt(it) }
+        // 每个分组：若干“行”，每行是从左到右的可聚焦控件
+        val groupRows: List<List<List<View>>> = listOf(
+            listOf(
+                listOfNotNull(byId(R.id.et_device_name), byId(R.id.btn_save_device_name)),
+                listOfNotNull(byId(R.id.row_prefer_5g))
+            ),
+            listOf(
+                radioRow,
+                listOfNotNull(byId(R.id.row_legacy_mode))
+            ),
+            listOf(
+                listOfNotNull(byId(R.id.row_skip_pair_verify)),
+                listOfNotNull(byId(R.id.row_av_trim)),
+                listOfNotNull(byId(R.id.btn_clear_pairings))
+            ),
+            listOf(
+                listOfNotNull(byId(R.id.row_language)),
+                listOfNotNull(byId(R.id.row_theme)),
+                listOfNotNull(byId(R.id.sp_update_mirror), byId(R.id.btn_save_update_cfg)),
+                listOfNotNull(byId(R.id.row_auto_update)),
+                listOfNotNull(byId(R.id.btn_view_logs), byId(R.id.btn_check_update))
+            )
+        ).map { rows -> rows.filter { it.isNotEmpty() } }
+
+        // 开关行右侧的胶囊只是状态指示：不抢焦点
+        listOf(
+            R.id.btn_prefer_5g, R.id.btn_legacy_mode, R.id.btn_skip_pair_verify,
+            R.id.btn_av_trim, R.id.btn_auto_update
+        ).forEach { byId(it)?.isFocusable = false }
+
+        // 进入分段单选组时落在“当前选中项”上，其余行取同列
+        fun pick(row: List<View>, col: Int): View =
+            if (row === radioRow) (rg.findViewById<View>(rg.checkedRadioButtonId) ?: row[0])
+            else row[minOf(col, row.size - 1)]
+
+        fun linkAll() {
+            back.nextFocusUpId = back.id
+            back.nextFocusLeftId = back.id
+            back.nextFocusRightId = back.id
+            back.nextFocusDownId = navItems[0].id
+            navItems.forEachIndexed { i, nav ->
+                nav.nextFocusUpId = if (i == 0) back.id else navItems[i - 1].id
+                nav.nextFocusDownId = if (i == navItems.size - 1) nav.id else navItems[i + 1].id
+                nav.nextFocusLeftId = nav.id
+                val rows = groupRows[i]
+                rows.firstOrNull()?.let { nav.nextFocusRightId = pick(it, 0).id }
+                rows.forEachIndexed { r, row ->
+                    row.forEachIndexed { c, view ->
+                        val up = rows.getOrNull(r - 1)?.let { pick(it, c) }
+                        val down = rows.getOrNull(r + 1)?.let { pick(it, c) }
+                        view.nextFocusUpId = (up ?: nav).id
+                        view.nextFocusDownId = (down ?: view).id
+                        view.nextFocusLeftId = if (c == 0) nav.id else row[c - 1].id
+                        view.nextFocusRightId = (row.getOrNull(c + 1) ?: view).id
+                    }
+                }
+            }
+        }
+        relinkFocus = { linkAll() }
+        linkAll()
+        navItems[0].requestFocus()
     }
 
     /** 更新开/关状态胶囊样式 */
@@ -163,6 +269,10 @@ class SettingsActivity : BaseActivity() {
     private var relinkFocus: (() -> Unit)? = null
 
     private fun setupManualDpad() {
+        if (navItems.isNotEmpty()) {          // 电视/横屏版走自己的焦点链
+            setupTvFocus()
+            return
+        }
         val rg = findViewById<RadioGroup>(R.id.rg_quality)
         // 按布局从上到下的停靠点；画质分段单选组作为一个停靠点（组内左右键切换）
         val stops: List<View> = listOfNotNull<View>(

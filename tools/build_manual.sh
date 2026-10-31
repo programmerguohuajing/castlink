@@ -43,8 +43,8 @@ APP_CP="$AJAR:$STDLIB:$ZXING:$COROUTINES_CORE:$COROUTINES_ANDROID:$BCPROV:$DDPLI
 
 PROJ=~/workspace/castlink
 OUT=$PROJ/build/manual
-VERSION_NAME="0.1.68"
-VERSION_CODE=89
+VERSION_NAME="0.1.69"
+VERSION_CODE=90
 APK_NAME="CastLink-v${VERSION_NAME}.apk"
 rm -rf "$OUT"
 mkdir -p "$OUT/gen" "$OUT/classes" "$OUT/dex"

@@ -54,7 +54,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="2dp"
-                        android:text="偏好设置、投屏参数与设备管理"
+                        android:text="@string/settings_subtitle"
                         android:textColor="@color/nebula_text_2ry"
                         android:textSize="12sp" />
                 </LinearLayout>

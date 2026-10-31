@@ -103,6 +103,17 @@ for f in kt:
                 if not (tags & okset): err(f'{os.path.basename(f)}: findViewById<{typ}>(R.id.{name}) but layout element is {tags}')
 print(f'[5] checked {cnt} Kotlin R.* usages / findViewById casts')
 
+
+# 各布局变体（layout-land / layout-sw*dp-land …）必须包含默认布局的全部 id：Kotlin 用非空类型 findViewById，缺一个就是启动崩溃
+variants=0
+for f in glob.glob(RES+'/layout-*/*.xml'):
+    base=os.path.join(RES,'layout',os.path.basename(f))
+    if not os.path.exists(base): continue
+    def idset(path): return {e.attrib[ANS+'id'][5:] for e in ET.parse(path).iter() if e.attrib.get(ANS+'id','').startswith('@+id/')}
+    miss=idset(base)-idset(f); variants+=1
+    if miss: err(f'{os.path.relpath(f,RES)} is missing ids that layout/ has: {sorted(miss)}')
+print(f'[6] layout variants checked for id superset: {variants}')
+
 # dpad focus list members & click wiring for new row
 sa=open(JAVA+'/com/castlink/receiver/ui/SettingsActivity.kt',encoding='utf-8').read()
 for n in re.findall(r'findViewById\(R\.id\.(\w+)\)',sa):

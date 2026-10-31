@@ -165,6 +165,7 @@
     <string name="qr_fallback">二维码生成失败，请手动输入 IP 连接</string>
 
     <!-- 设置页 -->
+    <string name="settings_subtitle">偏好设置、投屏参数与设备管理</string>
     <string name="title_settings">设置</string>
     <string name="setting_language_title">语言 / Language</string>
     <string name="setting_theme_title">外观</string>
